@@ -45,7 +45,7 @@ public class FileDiscoveryService : IFileDiscoveryService
     }
 
     /// <inheritdoc />
-    public IReadOnlyList<string> DiscoverFiles(string repositoryPath)
+    public IReadOnlyList<string> DiscoverFiles(string repositoryPath, IReadOnlyList<string>? additionalIgnorePaths = null)
     {
         var rootPath = Path.GetFullPath(repositoryPath);
 
@@ -60,6 +60,11 @@ public class FileDiscoveryService : IFileDiscoveryService
         // Build the gitignore filter from root and nested .gitignore files
         var ignore = BuildIgnoreFilter(rootPath);
 
+        // Build a set of user-specified ignore directory names for fast lookup
+        var userIgnoreSet = additionalIgnorePaths != null && additionalIgnorePaths.Count > 0
+            ? new HashSet<string>(additionalIgnorePaths, StringComparer.OrdinalIgnoreCase)
+            : null;
+
         var results = new List<string>();
 
         foreach (var file in Directory.EnumerateFiles(rootPath, "*", SearchOption.AllDirectories))
@@ -70,6 +75,13 @@ public class FileDiscoveryService : IFileDiscoveryService
             // Check if the file is inside an excluded directory
             if (IsInExcludedDirectory(normalizedFile))
             {
+                continue;
+            }
+
+            // Check if the file is inside a user-specified ignore directory
+            if (userIgnoreSet != null && IsInUserIgnoredDirectory(normalizedFile, userIgnoreSet))
+            {
+                _logger.LogDebug("Excluded by --ignore: {Path}", normalizedFile);
                 continue;
             }
 
@@ -169,6 +181,22 @@ public class FileDiscoveryService : IFileDiscoveryService
         for (int i = 0; i < segments.Length - 1; i++) // Skip the last segment (it's the filename)
         {
             if (ExcludedDirectories.Contains(segments[i]))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Checks whether any segment of the file path matches a user-specified ignore directory name.
+    /// </summary>
+    private static bool IsInUserIgnoredDirectory(string normalizedPath, HashSet<string> userIgnoreSet)
+    {
+        var segments = normalizedPath.Split('/');
+        for (int i = 0; i < segments.Length - 1; i++) // Skip the last segment (it's the filename)
+        {
+            if (userIgnoreSet.Contains(segments[i]))
             {
                 return true;
             }

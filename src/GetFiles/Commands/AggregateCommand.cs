@@ -24,22 +24,44 @@ public class AggregateCommand : Command
 
         StripCommentsOption = new Option<bool>(
             name: "--strip-comments",
-            description: "Remove comments from source files",
-            getDefaultValue: () => false);
+            description: "Remove comments from source files (default: true, use --no-strip-comments to disable)",
+            getDefaultValue: () => true);
 
         StripWhitespaceOption = new Option<bool>(
             name: "--strip-whitespace",
-            description: "Collapse unnecessary whitespace in source files",
+            description: "Collapse unnecessary whitespace in source files (default: true, use --no-strip-whitespace to disable)",
+            getDefaultValue: () => true);
+
+        NoStripCommentsOption = new Option<bool>(
+            name: "--no-strip-comments",
+            description: "Disable comment stripping",
             getDefaultValue: () => false);
+
+        NoStripWhitespaceOption = new Option<bool>(
+            name: "--no-strip-whitespace",
+            description: "Disable whitespace stripping",
+            getDefaultValue: () => false);
+
+        IgnoreOption = new Option<string[]>(
+            name: "--ignore",
+            description: "Additional folders/paths to exclude from file discovery (can be specified multiple times)",
+            getDefaultValue: () => Array.Empty<string>());
+        IgnoreOption.AllowMultipleArgumentsPerToken = true;
 
         AddOption(PathOption);
         AddOption(OutputOption);
         AddOption(StripCommentsOption);
         AddOption(StripWhitespaceOption);
+        AddOption(NoStripCommentsOption);
+        AddOption(NoStripWhitespaceOption);
+        AddOption(IgnoreOption);
     }
 
     public Option<string> PathOption { get; }
     public Option<string> OutputOption { get; }
     public Option<bool> StripCommentsOption { get; }
     public Option<bool> StripWhitespaceOption { get; }
+    public Option<bool> NoStripCommentsOption { get; }
+    public Option<bool> NoStripWhitespaceOption { get; }
+    public Option<string[]> IgnoreOption { get; }
 }

@@ -280,6 +280,76 @@ public class FileDiscoveryServiceTests : IDisposable
 
     #endregion
 
+    #region L2-2.4: User-Specified Ignore Paths
+
+    [Fact]
+    public void DiscoverFiles_IgnoreSingleDirectory_ExcludesMatchingDirectory()
+    {
+        // Arrange
+        CreateFile("src/app.ts", "export class App {}");
+        CreateFile("tests/app.spec.ts", "test stuff");
+        CreateFile("tests/helpers/setup.ts", "setup");
+
+        // Act
+        var files = _service.DiscoverFiles(_tempDir, new[] { "tests" });
+
+        // Assert
+        Assert.Single(files);
+        Assert.Contains(files, f => f.EndsWith("src/app.ts"));
+    }
+
+    [Fact]
+    public void DiscoverFiles_IgnoreMultipleDirectories_ExcludesAll()
+    {
+        // Arrange
+        CreateFile("src/app.ts", "export class App {}");
+        CreateFile("tests/app.spec.ts", "test stuff");
+        CreateFile("docs/readme.html", "<html>docs</html>");
+
+        // Act
+        var files = _service.DiscoverFiles(_tempDir, new[] { "tests", "docs" });
+
+        // Assert
+        Assert.Single(files);
+        Assert.Contains(files, f => f.EndsWith("src/app.ts"));
+    }
+
+    [Fact]
+    public void DiscoverFiles_IgnorePathWorksAtAnyDepth()
+    {
+        // Arrange
+        CreateFile("src/app.ts", "export class App {}");
+        CreateFile("src/db/migrations/001_init.cs", "class Migration {}");
+        CreateFile("migrations/schema.json", "{}");
+
+        // Act
+        var files = _service.DiscoverFiles(_tempDir, new[] { "migrations" });
+
+        // Assert
+        Assert.Single(files);
+        Assert.Contains(files, f => f.EndsWith("src/app.ts"));
+    }
+
+    [Fact]
+    public void DiscoverFiles_NoIgnorePaths_BehaviorUnchanged()
+    {
+        // Arrange
+        CreateFile("src/app.ts", "export class App {}");
+        CreateFile("tests/app.spec.ts", "test stuff");
+        CreateFile("docs/readme.html", "<html>docs</html>");
+
+        // Act – no ignore paths provided
+        var files = _service.DiscoverFiles(_tempDir);
+
+        // Assert – all files should be present
+        Assert.Equal(3, files.Count);
+        Assert.Contains(files, f => f.EndsWith("src/app.ts"));
+        Assert.Contains(files, f => f.EndsWith("tests/app.spec.ts"));
+        Assert.Contains(files, f => f.EndsWith("docs/readme.html"));
+    }
+
+    #endregion
+
     #region Edge Cases
 
     [Fact]

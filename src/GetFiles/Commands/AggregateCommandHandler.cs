@@ -27,10 +27,13 @@ public class AggregateCommandHandler
     /// <summary>
     /// Executes the aggregate workflow: discover files, then aggregate them.
     /// </summary>
-    public int Execute(string path, string output, bool stripComments, bool stripWhitespace)
+    public int Execute(string path, string output, bool stripComments, bool stripWhitespace, bool noStripComments, bool noStripWhitespace, string[] ignore)
     {
         try
         {
+            var effectiveStripComments = stripComments && !noStripComments;
+            var effectiveStripWhitespace = stripWhitespace && !noStripWhitespace;
+
             var repositoryPath = Path.GetFullPath(path);
 
             if (!Directory.Exists(repositoryPath))
@@ -40,11 +43,11 @@ public class AggregateCommandHandler
             }
 
             _logger.LogInformation("Discovering files in {Path}...", repositoryPath);
-            var files = _fileDiscoveryService.DiscoverFiles(repositoryPath);
+            var files = _fileDiscoveryService.DiscoverFiles(repositoryPath, ignore);
 
             _logger.LogInformation("Found {Count} file(s). Aggregating...", files.Count);
             var outputPath = Path.GetFullPath(output);
-            _codeAggregatorService.Aggregate(files, repositoryPath, outputPath, stripComments, stripWhitespace);
+            _codeAggregatorService.Aggregate(files, repositoryPath, outputPath, effectiveStripComments, effectiveStripWhitespace);
 
             _logger.LogInformation("Aggregation complete. Output written to {OutputPath}", outputPath);
             return 0;

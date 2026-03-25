@@ -59,5 +59,47 @@ public class RootCommandSmokeTests
         Assert.Contains("--output", output);
         Assert.Contains("--strip-comments", output);
         Assert.Contains("--strip-whitespace", output);
+        Assert.Contains("--no-strip-comments", output);
+        Assert.Contains("--no-strip-whitespace", output);
+    }
+
+    [Fact]
+    public void StripCommentsOption_DefaultIsTrue()
+    {
+        // Arrange
+        var command = new AggregateCommand();
+
+        // Assert
+        Assert.True(command.StripCommentsOption.Parse("").GetValueForOption(command.StripCommentsOption));
+    }
+
+    [Fact]
+    public void StripWhitespaceOption_DefaultIsTrue()
+    {
+        // Arrange
+        var command = new AggregateCommand();
+
+        // Assert
+        Assert.True(command.StripWhitespaceOption.Parse("").GetValueForOption(command.StripWhitespaceOption));
+    }
+
+    [Fact]
+    public void NoStripCommentsOption_DefaultIsFalse()
+    {
+        // Arrange
+        var command = new AggregateCommand();
+
+        // Assert
+        Assert.False(command.NoStripCommentsOption.Parse("").GetValueForOption(command.NoStripCommentsOption));
+    }
+
+    [Fact]
+    public void NoStripWhitespaceOption_DefaultIsFalse()
+    {
+        // Arrange
+        var command = new AggregateCommand();
+
+        // Assert
+        Assert.False(command.NoStripWhitespaceOption.Parse("").GetValueForOption(command.NoStripWhitespaceOption));
     }
 }

@@ -46,9 +46,12 @@ aggregateCommand.SetHandler(
         var output = context.ParseResult.GetValueForOption(aggregateCommand.OutputOption)!;
         var stripComments = context.ParseResult.GetValueForOption(aggregateCommand.StripCommentsOption);
         var stripWhitespace = context.ParseResult.GetValueForOption(aggregateCommand.StripWhitespaceOption);
+        var noStripComments = context.ParseResult.GetValueForOption(aggregateCommand.NoStripCommentsOption);
+        var noStripWhitespace = context.ParseResult.GetValueForOption(aggregateCommand.NoStripWhitespaceOption);
+        var ignore = context.ParseResult.GetValueForOption(aggregateCommand.IgnoreOption) ?? Array.Empty<string>();
 
         var handler = serviceProvider.GetRequiredService<AggregateCommandHandler>();
-        context.ExitCode = handler.Execute(path, output, stripComments, stripWhitespace);
+        context.ExitCode = handler.Execute(path, output, stripComments, stripWhitespace, noStripComments, noStripWhitespace, ignore);
     });
 
 rootCommand.AddCommand(aggregateCommand);
