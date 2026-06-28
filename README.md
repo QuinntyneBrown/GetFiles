@@ -57,6 +57,7 @@ get-files aggregate --path ./my-repo --ignore coverage .vscode
 ## Building from Source
 
 ```bash
+cd backend
 dotnet build
 ```
 
@@ -65,7 +66,7 @@ dotnet build
 To build, uninstall any existing version, and install the latest locally:
 
 ```cmd
-eng\scripts\install-tool.bat
+backend\eng\scripts\install-tool.bat
 ```
 
 This packs the tool in Release configuration, removes any previously installed global version, and installs the freshly built package.
@@ -73,6 +74,7 @@ This packs the tool in Release configuration, removes any previously installed g
 ## Running Tests
 
 ```bash
+cd backend
 dotnet test
 ```
 
