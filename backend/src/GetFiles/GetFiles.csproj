@@ -17,8 +17,13 @@
     <PackageProjectUrl>https://github.com/QuinntyneBrown/GetFiles</PackageProjectUrl>
     <RepositoryUrl>https://github.com/QuinntyneBrown/GetFiles</RepositoryUrl>
     <PackageTags>cli;code-aggregator;llm;dotnet-tool</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <Version>1.3.0</Version>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="GetFiles.Tests" />

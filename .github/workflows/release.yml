@@ -2,12 +2,18 @@ name: Release
 
 on:
   push:
+    branches: [main]
     tags:
       - "v*.*.*"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+# Avoid two publish runs racing each other when commits land in quick succession.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -31,7 +37,7 @@ jobs:
         run: dotnet restore GetFiles.sln
 
       - name: Build
-        run: dotnet build src/GetFiles/GetFiles.csproj --configuration Release --no-restore
+        run: dotnet build GetFiles.sln --configuration Release --no-restore
 
       - name: Test
         run: dotnet test GetFiles.sln --configuration Release --no-build
@@ -40,4 +46,7 @@ jobs:
         run: dotnet pack src/GetFiles/GetFiles.csproj --configuration Release --no-build --output ./artifacts
 
       - name: Publish to NuGet
+        # --skip-duplicate makes this a no-op when <Version> in the csproj is
+        # unchanged, so every push to main is safe; a new version publishes only
+        # when the version number is bumped.
         run: dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
