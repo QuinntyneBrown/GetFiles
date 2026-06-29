@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The `aggregate` command now always ignores `package-lock.json` files at any
+  depth, regardless of `.gitignore` content. These generated lock files are
+  large and add only noise to the aggregated output.
+
 ## [1.3.0]
 
 ### Added

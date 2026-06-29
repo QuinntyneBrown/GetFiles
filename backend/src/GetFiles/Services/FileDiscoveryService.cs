@@ -39,6 +39,15 @@ public class FileDiscoveryService : IFileDiscoveryService
         ".git"
     };
 
+    /// <summary>
+    /// File names that are always excluded, regardless of extension or .gitignore content.
+    /// <c>package-lock.json</c> is generated, enormous, and noise for an LLM payload.
+    /// </summary>
+    public static readonly IReadOnlySet<string> ExcludedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "package-lock.json"
+    };
+
     public FileDiscoveryService(ILogger<FileDiscoveryService> logger)
     {
         _logger = logger;
@@ -80,6 +89,12 @@ public class FileDiscoveryService : IFileDiscoveryService
 
             // Check if the file is inside an excluded directory
             if (PathHasSegmentIn(relativePath, ExcludedDirectories))
+            {
+                continue;
+            }
+
+            // Check if the file name itself is always excluded (e.g. package-lock.json)
+            if (ExcludedFileNames.Contains(Path.GetFileName(normalizedFile)))
             {
                 continue;
             }

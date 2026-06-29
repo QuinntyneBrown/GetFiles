@@ -214,6 +214,53 @@ public class FileDiscoveryServiceTests : IDisposable
         Assert.Contains(files, f => f.EndsWith("src/app.ts"));
     }
 
+    [Fact]
+    public void DiscoverFiles_AlwaysExcludesPackageLockJson()
+    {
+        // Arrange
+        CreateFile("src/app.ts", "export class App {}");
+        CreateFile("package-lock.json", "{}");
+        CreateFile("src/package-lock.json", "{}");
+
+        // Act
+        var files = _service.DiscoverFiles(_tempDir);
+
+        // Assert
+        Assert.Single(files);
+        Assert.Contains(files, f => f.EndsWith("src/app.ts"));
+    }
+
+    [Fact]
+    public void DiscoverFiles_ExcludesPackageLockJson_RegardlessOfCasing()
+    {
+        // Arrange
+        CreateFile("src/app.ts", "export class App {}");
+        CreateFile("Package-Lock.JSON", "{}");
+
+        // Act
+        var files = _service.DiscoverFiles(_tempDir);
+
+        // Assert
+        Assert.Single(files);
+        Assert.Contains(files, f => f.EndsWith("src/app.ts"));
+    }
+
+    [Fact]
+    public void DiscoverFiles_ExcludesPackageLockJson_EvenWhenIncludedByNegatedGitignore()
+    {
+        // Arrange — even an explicit re-include must not bring it back.
+        CreateFile("src/app.ts", "export class App {}");
+        CreateFile("package-lock.json", "{}");
+        CreateFile(".gitignore", "*.json\n!package-lock.json\n");
+
+        // Act
+        var files = _service.DiscoverFiles(_tempDir);
+
+        // Assert
+        Assert.Single(files);
+        Assert.Contains(files, f => f.EndsWith("src/app.ts"));
+    }
+
     #endregion
 
     #region L2-2.2: .gitignore Filtering

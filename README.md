@@ -44,7 +44,7 @@ by hand is tedious and wastes context on boilerplate. **GetFiles** automates tha
 
 - 🗂️ **One file, whole repo** — recursively collects supported source files into a single output.
 - 🚫 **Respects `.gitignore`** — honors root and nested ignore rules, and always skips
-  `node_modules`, `dist`, `bin`, `obj`, and `.git`.
+  `node_modules`, `dist`, `bin`, `obj`, `.git`, and `package-lock.json`.
 - ✂️ **Token-aware** — strips comments and collapses whitespace by default to shrink the payload
   you hand to an LLM (toggle off when you want the originals).
 - 🧭 **Deterministic output** — files are emitted in a stable, sorted order with clear delimiters.
@@ -168,7 +168,8 @@ Files with any other extension are skipped during discovery.
 
 1. **File discovery** — recursively walks the repository, including only
    [supported extensions](#supported-file-types). It applies `.gitignore` rules from both the root
-   and nested ignore files, and always excludes `node_modules`, `dist`, `bin`, `obj`, and `.git`.
+   and nested ignore files, and always excludes `node_modules`, `dist`, `bin`, `obj`, `.git`, and
+   `package-lock.json` files.
    The resulting list is sorted for deterministic output.
 2. **Aggregation** — reads each discovered file and writes it to the output with
    `=== FILE: path ===` / `=== END FILE: path ===` delimiters and a blank line between entries.
