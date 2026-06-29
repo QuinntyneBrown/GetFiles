@@ -9,7 +9,7 @@
 
     <!-- NuGet / dotnet tool settings -->
     <PackAsTool>true</PackAsTool>
-    <ToolCommandName>get-files</ToolCommandName>
+    <ToolCommandName>gf</ToolCommandName>
     <PackageId>QuinntyneBrown.GetFiles</PackageId>
     <Authors>QuinntyneBrown</Authors>
     <Description>A CLI tool that aggregates repository source code into a single file for LLM consumption.</Description>
@@ -17,7 +17,7 @@
     <PackageProjectUrl>https://github.com/QuinntyneBrown/GetFiles</PackageProjectUrl>
     <RepositoryUrl>https://github.com/QuinntyneBrown/GetFiles</RepositoryUrl>
     <PackageTags>cli;code-aggregator;llm;dotnet-tool</PackageTags>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

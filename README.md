@@ -75,7 +75,7 @@ dotnet tool uninstall --global QuinntyneBrown.GetFiles
 ## Quick Start
 
 ```bash
-get-files aggregate --path ./my-repo
+gf aggregate --path ./my-repo
 ```
 
 This scans `./my-repo` and writes everything to `codebase.txt` in the current directory, with
@@ -84,7 +84,7 @@ comments and excess whitespace stripped. That's it — paste the result into you
 ## Usage
 
 ```bash
-get-files aggregate --path <repository-path> [options]
+gf aggregate --path <repository-path> [options]
 ```
 
 ### Options
@@ -108,25 +108,25 @@ get-files aggregate --path <repository-path> [options]
 Aggregate a repository with the default settings (comments and whitespace stripped):
 
 ```bash
-get-files aggregate --path ./my-repo
+gf aggregate --path ./my-repo
 ```
 
 Preserve the source exactly as written:
 
 ```bash
-get-files aggregate --path ./my-repo --no-strip-comments --no-strip-whitespace
+gf aggregate --path ./my-repo --no-strip-comments --no-strip-whitespace
 ```
 
 Write to a custom output file:
 
 ```bash
-get-files aggregate --path ./my-repo --output context.txt
+gf aggregate --path ./my-repo --output context.txt
 ```
 
 Exclude additional directories (the flag is repeatable):
 
 ```bash
-get-files aggregate --path ./my-repo --ignore coverage --ignore .vscode
+gf aggregate --path ./my-repo --ignore coverage --ignore .vscode
 ```
 
 ## Output Format
