@@ -87,6 +87,9 @@ comments and excess whitespace stripped. That's it — paste the result into you
 gf aggregate --path <repository-path> [options]
 ```
 
+`aggregate` is the default command, so it can be omitted — `gf -p <repository-path>`
+is equivalent to `gf aggregate -p <repository-path>`.
+
 ### Options
 
 | Option | Alias | Description | Default |
@@ -129,10 +132,11 @@ Exclude additional directories (the flag is repeatable):
 gf aggregate --path ./my-repo --ignore coverage --ignore .vscode
 ```
 
-The `--path`, `--output`, and `--ignore` options also accept short aliases (`-p`, `-o`, `-i`):
+The `--path`, `--output`, and `--ignore` options also accept short aliases (`-p`, `-o`, `-i`),
+and the `aggregate` command name can be dropped entirely:
 
 ```bash
-gf aggregate -p ./my-repo -o context.txt -i coverage
+gf -p ./my-repo -o context.txt -i coverage
 ```
 
 ## Output Format

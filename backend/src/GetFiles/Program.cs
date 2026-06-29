@@ -56,5 +56,19 @@ aggregateCommand.SetHandler(
 
 rootCommand.AddCommand(aggregateCommand);
 
+// ── Default command ────────────────────────────────────────────────
+// "aggregate" is the default subcommand: when the first argument is an
+// option (or anything other than a known command) the tool behaves as if
+// "aggregate" had been typed, so `gf -p ./repo` == `gf aggregate -p ./repo`.
+// Help/version flags are passed through untouched so root-level help still works.
+string[] knownCommands = { "aggregate" };
+string[] passthroughFlags = { "-h", "--help", "-?", "/h", "/?", "--version" };
+if (args.Length > 0
+    && !knownCommands.Contains(args[0])
+    && !passthroughFlags.Contains(args[0]))
+{
+    args = args.Prepend("aggregate").ToArray();
+}
+
 // ── Run ────────────────────────────────────────────────────────────
 return await rootCommand.InvokeAsync(args);
