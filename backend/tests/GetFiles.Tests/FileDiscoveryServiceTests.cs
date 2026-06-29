@@ -121,8 +121,12 @@ public class FileDiscoveryServiceTests : IDisposable
         Assert.Single(files);
         var filePath = files[0];
 
-        // Should be an absolute path
-        Assert.True(Path.IsPathRooted(filePath.Replace('/', '\\')),
+        // Should be an absolute path. The service emits forward-slash paths on every
+        // platform (e.g. "C:/repo/src/app.ts" on Windows, "/repo/src/app.ts" on Linux),
+        // both of which Path.IsPathRooted recognizes — so assert on the path as-is.
+        // (The previous Replace('/', '\\') hack failed on Linux, where a leading "\"
+        // is not a root indicator.)
+        Assert.True(Path.IsPathRooted(filePath),
             $"Path should be absolute: {filePath}");
 
         // Should use forward slashes
