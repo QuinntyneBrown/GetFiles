@@ -12,6 +12,13 @@ var configuration = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
     .Build();
 
+// ── Logging verbosity ──────────────────────────────────────────────
+// The minimum level is resolved from configuration ("Logging:LogLevel:Default"
+// in appsettings.json) and then overridden by the --verbose / --quiet flags.
+// This is what makes the LogDebug diagnostics (e.g. "why was this file
+// excluded?") reachable and satisfies the "configurable verbosity" requirement.
+var minimumLevel = GetFiles.LogVerbosity.Resolve(configuration, args);
+
 // ── Dependency Injection ───────────────────────────────────────────
 var services = new ServiceCollection();
 
@@ -20,7 +27,7 @@ services.AddSingleton<IConfiguration>(configuration);
 services.AddLogging(builder =>
 {
     builder.AddConsole();
-    builder.SetMinimumLevel(LogLevel.Information);
+    builder.SetMinimumLevel(minimumLevel);
 });
 
 // Application services
@@ -42,16 +49,30 @@ var aggregateCommand = new AggregateCommand();
 aggregateCommand.SetHandler(
     (InvocationContext context) =>
     {
-        var path = context.ParseResult.GetValueForOption(aggregateCommand.PathOption)!;
-        var output = context.ParseResult.GetValueForOption(aggregateCommand.OutputOption)!;
-        var stripComments = context.ParseResult.GetValueForOption(aggregateCommand.StripCommentsOption);
-        var stripWhitespace = context.ParseResult.GetValueForOption(aggregateCommand.StripWhitespaceOption);
-        var noStripComments = context.ParseResult.GetValueForOption(aggregateCommand.NoStripCommentsOption);
-        var noStripWhitespace = context.ParseResult.GetValueForOption(aggregateCommand.NoStripWhitespaceOption);
-        var ignore = context.ParseResult.GetValueForOption(aggregateCommand.IgnoreOption) ?? Array.Empty<string>();
+        var parse = context.ParseResult;
+        var path = parse.GetValueForOption(aggregateCommand.PathOption)!;
+        var output = parse.GetValueForOption(aggregateCommand.OutputOption)!;
+        var stripComments = parse.GetValueForOption(aggregateCommand.StripCommentsOption);
+        var stripWhitespace = parse.GetValueForOption(aggregateCommand.StripWhitespaceOption);
+        var noStripComments = parse.GetValueForOption(aggregateCommand.NoStripCommentsOption);
+        var noStripWhitespace = parse.GetValueForOption(aggregateCommand.NoStripWhitespaceOption);
+        var ignore = parse.GetValueForOption(aggregateCommand.IgnoreOption) ?? Array.Empty<string>();
+
+        // Warn instead of silently resolving contradictory flags. The
+        // --no-* flag wins (effective = strip && !noStrip), but the user
+        // should know that an explicit --strip-* request was overridden.
+        var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("GetFiles");
+        var tokens = parse.Tokens.Select(t => t.Value).ToHashSet(StringComparer.Ordinal);
+        if (tokens.Contains("--strip-comments") && tokens.Contains("--no-strip-comments"))
+            logger.LogWarning("Both --strip-comments and --no-strip-comments were specified; comment stripping is disabled.");
+        if (tokens.Contains("--strip-whitespace") && tokens.Contains("--no-strip-whitespace"))
+            logger.LogWarning("Both --strip-whitespace and --no-strip-whitespace were specified; whitespace stripping is disabled.");
+
+        var effectiveStripComments = stripComments && !noStripComments;
+        var effectiveStripWhitespace = stripWhitespace && !noStripWhitespace;
 
         var handler = serviceProvider.GetRequiredService<AggregateCommandHandler>();
-        context.ExitCode = handler.Execute(path, output, stripComments, stripWhitespace, noStripComments, noStripWhitespace, ignore);
+        context.ExitCode = handler.Execute(path, output, effectiveStripComments, effectiveStripWhitespace, ignore);
     });
 
 rootCommand.AddCommand(aggregateCommand);

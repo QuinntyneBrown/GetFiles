@@ -61,6 +61,8 @@ public class RootCommandSmokeTests
         Assert.Contains("--strip-whitespace", output);
         Assert.Contains("--no-strip-comments", output);
         Assert.Contains("--no-strip-whitespace", output);
+        Assert.Contains("--verbose", output);
+        Assert.Contains("--quiet", output);
     }
 
     [Fact]

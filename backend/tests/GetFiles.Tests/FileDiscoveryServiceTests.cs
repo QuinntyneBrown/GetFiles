@@ -38,8 +38,6 @@ public class FileDiscoveryServiceTests : IDisposable
         return fullPath;
     }
 
-    private string NormalizePath(string path) => path.Replace('\\', '/');
-
     #endregion
 
     #region L2-2.1: File Discovery by Extension
@@ -176,6 +174,26 @@ public class FileDiscoveryServiceTests : IDisposable
     }
 
     [Fact]
+    public void DiscoverFiles_ExcludedNameInRepositoryRootPath_DoesNotExcludeFiles()
+    {
+        // Arrange — the repository root itself lives under a directory literally
+        // named "bin". Exclusions are relative to the root, so files inside the
+        // repository must still be discovered (the "bin" prefix is not the repo's).
+        var repoRoot = Path.Combine(_tempDir, "bin", "myrepo");
+        Directory.CreateDirectory(repoRoot);
+        File.WriteAllText(Path.Combine(repoRoot, "app.ts"), "export class App {}");
+        var srcDir = Path.Combine(repoRoot, "src");
+        Directory.CreateDirectory(srcDir);
+        File.WriteAllText(Path.Combine(srcDir, "b.ts"), "export class B {}");
+
+        // Act
+        var files = _service.DiscoverFiles(repoRoot);
+
+        // Assert
+        Assert.Equal(2, files.Count);
+    }
+
+    [Fact]
     public void DiscoverFiles_ExcludesHardcodedDirectoriesAtAnyDepth()
     {
         // Arrange
@@ -276,6 +294,24 @@ public class FileDiscoveryServiceTests : IDisposable
         Assert.Equal(2, files.Count);
         Assert.Contains(files, f => f.EndsWith("src/app.ts"));
         Assert.Contains(files, f => f.EndsWith("src/generated/keep.ts"));
+    }
+
+    [Fact]
+    public void DiscoverFiles_NestedGitignoreNegation_ReincludesNegatedFile()
+    {
+        // Arrange: a nested .gitignore ignores all .ts then re-includes keep.ts.
+        // The leading "!" must be preserved when the pattern is prefixed with its
+        // directory, otherwise the negation is lost and keep.ts is wrongly dropped.
+        CreateFile("src/foo/output.ts", "generated");
+        CreateFile("src/foo/keep.ts", "keep this");
+        CreateFile("src/foo/.gitignore", "*.ts\n!keep.ts\n");
+
+        // Act
+        var files = _service.DiscoverFiles(_tempDir);
+
+        // Assert
+        Assert.Single(files);
+        Assert.Contains(files, f => f.EndsWith("src/foo/keep.ts"));
     }
 
     #endregion

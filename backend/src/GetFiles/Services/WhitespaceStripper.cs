@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace GetFiles.Services;
 
 /// <summary>
@@ -13,68 +11,46 @@ public class WhitespaceStripper : IWhitespaceStripper
         if (string.IsNullOrEmpty(content))
             return content;
 
-        // Normalize line endings to \n for consistent processing, then restore
-        // the dominant line ending at the end.
+        // Normalize line endings to \n for processing, restoring the dominant
+        // ending on the way out.
         var useCrLf = content.Contains("\r\n");
-        var normalized = content.Replace("\r\n", "\n");
+        var lines = content.Replace("\r\n", "\n").Split('\n');
 
-        var lines = normalized.Split('\n');
-        var sb = new StringBuilder(content.Length);
-        var consecutiveBlankLines = 0;
+        // Defer blank-line emission rather than emitting-then-back-patching:
+        // count a pending run of blank lines and flush it sized for the rule
+        // (3+ blank lines collapse to one) only when the next content line
+        // arrives. This avoids the off-by-one surgery the old version needed.
+        var output = new List<string>(lines.Length);
+        var pendingBlanks = 0;
 
-        for (var i = 0; i < lines.Length; i++)
+        foreach (var rawLine in lines)
         {
-            var line = TrimTrailingWhitespace(lines[i]);
+            var line = TrimTrailingWhitespace(rawLine);
 
             if (line.Length == 0)
             {
-                consecutiveBlankLines++;
-
-                // Emit at most 1 blank line (collapse 3+ into 1, keep single blanks)
-                if (consecutiveBlankLines <= 2)
-                {
-                    if (i > 0)
-                        sb.Append(useCrLf ? "\r\n" : "\n");
-                }
-                // When consecutiveBlankLines >= 3, skip the line entirely
+                pendingBlanks++;
+                continue;
             }
-            else
-            {
-                // If we had 3+ blank lines, we already emitted none of the extras.
-                // We need exactly 1 blank line separator, which means one newline
-                // before this content line in addition to the newline ending the
-                // last content line.
-                if (consecutiveBlankLines >= 3 && sb.Length > 0)
-                {
-                    // We emitted 2 blank-line newlines above (for count 1 and 2).
-                    // We need to remove the second one and replace with just the
-                    // separator for this content line.
-                    // Actually, let's simplify: we emitted newlines for blank counts
-                    // 1 and 2. That means after the last content line we have:
-                    //   \n  (end of content line)
-                    //   \n  (blank line 1)
-                    //   \n  (blank line 2)
-                    // We want only one blank line:
-                    //   \n  (end of content line)
-                    //   \n  (blank line = one blank line)
-                    // So remove the last \n from sb.
-                    var ending = useCrLf ? "\r\n" : "\n";
-                    if (sb.Length >= ending.Length)
-                    {
-                        sb.Remove(sb.Length - ending.Length, ending.Length);
-                    }
-                }
 
-                consecutiveBlankLines = 0;
+            // A run of 3+ blank lines collapses to a single blank line; 1-2 are kept.
+            AppendBlankLines(output, pendingBlanks >= 3 ? 1 : pendingBlanks);
+            pendingBlanks = 0;
 
-                if (i > 0)
-                    sb.Append(useCrLf ? "\r\n" : "\n");
-
-                sb.Append(line);
-            }
+            output.Add(line);
         }
 
-        return sb.ToString();
+        // A trailing blank run is kept but capped at 2 (a trailing run is never
+        // collapsed to a single line — it is simply truncated at the cap).
+        AppendBlankLines(output, Math.Min(pendingBlanks, 2));
+
+        return string.Join(useCrLf ? "\r\n" : "\n", output);
+    }
+
+    private static void AppendBlankLines(List<string> output, int count)
+    {
+        for (var i = 0; i < count; i++)
+            output.Add(string.Empty);
     }
 
     /// <summary>

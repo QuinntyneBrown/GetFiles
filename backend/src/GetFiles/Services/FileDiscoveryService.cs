@@ -70,16 +70,22 @@ public class FileDiscoveryService : IFileDiscoveryService
         foreach (var file in Directory.EnumerateFiles(rootPath, "*", SearchOption.AllDirectories))
         {
             // Normalize to forward slashes for consistency
-            var normalizedFile = file.Replace('\\', '/');
+            var normalizedFile = PathUtil.ToForwardSlashes(file);
+
+            // Directory exclusions are matched on the path *relative to the repository
+            // root*, not the absolute path — otherwise an excluded-dir name in the root
+            // prefix (e.g. a repo living under ".../bin/...") would wrongly exclude every
+            // file in the repository.
+            var relativePath = PathUtil.GetRelativePath(rootPath, normalizedFile);
 
             // Check if the file is inside an excluded directory
-            if (IsInExcludedDirectory(normalizedFile))
+            if (PathHasSegmentIn(relativePath, ExcludedDirectories))
             {
                 continue;
             }
 
             // Check if the file is inside a user-specified ignore directory
-            if (userIgnoreSet != null && IsInUserIgnoredDirectory(normalizedFile, userIgnoreSet))
+            if (userIgnoreSet != null && PathHasSegmentIn(relativePath, userIgnoreSet))
             {
                 _logger.LogDebug("Excluded by --ignore: {Path}", normalizedFile);
                 continue;
@@ -93,14 +99,10 @@ public class FileDiscoveryService : IFileDiscoveryService
             }
 
             // Check against .gitignore rules
-            if (ignore != null)
+            if (ignore != null && ignore.IsIgnored(relativePath))
             {
-                var relativePath = GetRelativePath(rootPath, normalizedFile);
-                if (ignore.IsIgnored(relativePath))
-                {
-                    _logger.LogDebug("Excluded by .gitignore: {Path}", relativePath);
-                    continue;
-                }
+                _logger.LogDebug("Excluded by .gitignore: {Path}", relativePath);
+                continue;
             }
 
             results.Add(normalizedFile);
@@ -120,7 +122,7 @@ public class FileDiscoveryService : IFileDiscoveryService
     private Ignore.Ignore? BuildIgnoreFilter(string rootPath)
     {
         var gitignoreFiles = Directory.EnumerateFiles(rootPath, ".gitignore", SearchOption.AllDirectories)
-            .Where(f => !IsInExcludedDirectory(f.Replace('\\', '/')))
+            .Where(f => !PathHasSegmentIn(PathUtil.GetRelativePath(rootPath, f), ExcludedDirectories))
             .ToList();
 
         if (gitignoreFiles.Count == 0)
@@ -135,30 +137,26 @@ public class FileDiscoveryService : IFileDiscoveryService
         {
             var lines = File.ReadAllLines(gitignoreFile);
             var gitignoreDir = Path.GetDirectoryName(gitignoreFile)!;
-            var relativeDirPath = GetRelativePath(rootPath, gitignoreDir.Replace('\\', '/'));
+            var relativeDirPath = PathUtil.GetRelativePath(rootPath, gitignoreDir);
 
             foreach (var line in lines)
             {
                 var trimmed = line.Trim();
 
-                // Skip empty lines and comments
+                // Skip blank lines and comments. This is NOT redundant with the Ignore
+                // library's own comment/blank handling: for nested .gitignore files we
+                // rewrite each pattern with a directory prefix below, and a blank or
+                // "#"-prefixed line would otherwise be turned into a bogus pattern
+                // (e.g. "" -> "src/foo/", silently ignoring the whole directory).
                 if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#'))
                 {
                     continue;
                 }
 
-                // For nested .gitignore files, prefix patterns with the relative directory
+                // For nested .gitignore files, prefix patterns with the relative directory.
                 if (!string.IsNullOrEmpty(relativeDirPath) && relativeDirPath != ".")
                 {
-                    // If the pattern starts with /, it's relative to the .gitignore location
-                    if (trimmed.StartsWith('/'))
-                    {
-                        ignore.Add(relativeDirPath + trimmed);
-                    }
-                    else
-                    {
-                        ignore.Add(relativeDirPath + "/" + trimmed);
-                    }
+                    ignore.Add(PrefixPattern(trimmed, relativeDirPath));
                 }
                 else
                 {
@@ -173,43 +171,42 @@ public class FileDiscoveryService : IFileDiscoveryService
     }
 
     /// <summary>
-    /// Checks whether any segment of the file path is a hardcoded excluded directory.
+    /// Prefixes a nested .gitignore pattern with its directory (relative to the repo root).
+    /// A leading "!" negation is preserved so re-include rules keep working — e.g.
+    /// "!keep.ts" in "src/foo" becomes "!src/foo/keep.ts", not "src/foo/!keep.ts"
+    /// (which the Ignore library would treat as a literal filename, not a negation).
     /// </summary>
-    private static bool IsInExcludedDirectory(string normalizedPath)
+    private static string PrefixPattern(string pattern, string relativeDirPath)
+    {
+        var negated = pattern.StartsWith('!');
+        if (negated)
+        {
+            pattern = pattern[1..];
+        }
+
+        // A leading slash anchors the pattern to the .gitignore's own directory.
+        var prefixed = pattern.StartsWith('/')
+            ? relativeDirPath + pattern
+            : relativeDirPath + "/" + pattern;
+
+        return negated ? "!" + prefixed : prefixed;
+    }
+
+    /// <summary>
+    /// Checks whether any directory segment of the file path (excluding the filename)
+    /// is contained in <paramref name="names"/>. Serves both the hardcoded exclusions
+    /// and user-specified ignore directories.
+    /// </summary>
+    private static bool PathHasSegmentIn(string normalizedPath, IReadOnlySet<string> names)
     {
         var segments = normalizedPath.Split('/');
         for (int i = 0; i < segments.Length - 1; i++) // Skip the last segment (it's the filename)
         {
-            if (ExcludedDirectories.Contains(segments[i]))
+            if (names.Contains(segments[i]))
             {
                 return true;
             }
         }
         return false;
-    }
-
-    /// <summary>
-    /// Checks whether any segment of the file path matches a user-specified ignore directory name.
-    /// </summary>
-    private static bool IsInUserIgnoredDirectory(string normalizedPath, HashSet<string> userIgnoreSet)
-    {
-        var segments = normalizedPath.Split('/');
-        for (int i = 0; i < segments.Length - 1; i++) // Skip the last segment (it's the filename)
-        {
-            if (userIgnoreSet.Contains(segments[i]))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Gets the relative path from root to target using forward slashes.
-    /// </summary>
-    private static string GetRelativePath(string rootPath, string targetPath)
-    {
-        var relative = Path.GetRelativePath(rootPath, targetPath);
-        return relative.Replace('\\', '/');
     }
 }

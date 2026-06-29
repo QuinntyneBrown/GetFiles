@@ -101,7 +101,7 @@ public class CommentStripperTests
     public void StripComments_PreservesSingleQuotedString()
     {
         var input = "var c = '//';";
-        var result = _sut.StripComments(input, ".js");
+        var result = _sut.StripComments(input, ".ts");
         Assert.Equal("var c = '//';", result);
     }
 
@@ -170,11 +170,21 @@ public class CommentStripperTests
     }
 
     [Fact]
-    public void StripComments_JsExtension_StripsComments()
+    public void StripComments_TsExtension_StripsComments()
     {
         var input = "let x = 1; // comment";
-        var result = _sut.StripComments(input, ".js");
+        var result = _sut.StripComments(input, ".ts");
         Assert.Equal("let x = 1; ", result);
+    }
+
+    [Fact]
+    public void StripComments_JsExtension_NotDiscoveredSoLeftUnchanged()
+    {
+        // .js is intentionally not in the discovery/strip extension set (the tool
+        // targets .ts for Angular). Unknown-to-the-stripper extensions pass through.
+        var input = "let x = 1; // comment";
+        var result = _sut.StripComments(input, ".js");
+        Assert.Equal(input, result);
     }
 
     [Fact]
@@ -199,5 +209,91 @@ public class CommentStripperTests
         var input = "var s = \"she said \\\"hello\\\"\"; // comment";
         var result = _sut.StripComments(input, ".cs");
         Assert.Equal("var s = \"she said \\\"hello\\\"\"; ", result);
+    }
+
+    // ── C1: CSS/SCSS unquoted url() must survive the // path ──────────
+
+    [Fact]
+    public void StripComments_PreservesUnquotedAbsoluteUrl_Scss()
+    {
+        // SCSS supports // line comments, but a // inside url(...) is part of the URL.
+        var input = "body { background: url(http://cdn.example.com/bg.png); }";
+        var result = _sut.StripComments(input, ".scss");
+        Assert.Equal(input, result);
+    }
+
+    [Fact]
+    public void StripComments_PreservesProtocolRelativeImportUrl_Css()
+    {
+        // CSS has no // line comments at all; the protocol-relative URL must survive.
+        var input = "@import url(//cdn.example.com/reset.css);";
+        var result = _sut.StripComments(input, ".css");
+        Assert.Equal(input, result);
+    }
+
+    [Fact]
+    public void StripComments_DoesNotStripDoubleSlashInCss()
+    {
+        // CSS has no // comments, so a stray // is content, not a comment to delete.
+        var input = "a { color: red; } // not-a-comment";
+        var result = _sut.StripComments(input, ".css");
+        Assert.Equal(input, result);
+    }
+
+    [Fact]
+    public void StripComments_StripsLineCommentInScss()
+    {
+        var input = "$x: 1; // gone\n.a { color: red; }";
+        var result = _sut.StripComments(input, ".scss");
+        Assert.Equal("$x: 1; \n.a { color: red; }", result);
+    }
+
+    [Fact]
+    public void StripComments_StripsBlockCommentInCss()
+    {
+        var input = "a { /* c */ color: red; }";
+        var result = _sut.StripComments(input, ".css");
+        Assert.Equal("a {  color: red; }", result);
+    }
+
+    // ── C2/C3: C# verbatim string awareness ──────────────────────────
+
+    [Fact]
+    public void StripComments_PreservesMultiLineVerbatimString_AndStripsTrailingComment()
+    {
+        // A real-newline verbatim string with an embedded URL and trailing comment.
+        var input = "var json = @\"{\n  \"\"url\"\": \"\"http://example.com\"\"\n}\"; // trailing";
+        var expected = "var json = @\"{\n  \"\"url\"\": \"\"http://example.com\"\"\n}\"; ";
+        var result = _sut.StripComments(input, ".cs");
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void StripComments_VerbatimStringEndingInBackslash_ClosesCorrectly()
+    {
+        // @"C:\temp\" — the trailing backslash is literal; the next " closes the string.
+        var input = "var dir = @\"C:\\temp\\\"; // comment";
+        var expected = "var dir = @\"C:\\temp\\\"; ";
+        var result = _sut.StripComments(input, ".cs");
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void StripComments_PreservesInterpolatedVerbatimString()
+    {
+        var input = "var s = $@\"path//{x}\"; // c";
+        var expected = "var s = $@\"path//{x}\"; ";
+        var result = _sut.StripComments(input, ".cs");
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void StripComments_DoesNotTreatEscapedIdentifierAsVerbatim()
+    {
+        // @class is an escaped identifier, not a verbatim string opener.
+        var input = "var @class = 1; // gone";
+        var expected = "var @class = 1; ";
+        var result = _sut.StripComments(input, ".cs");
+        Assert.Equal(expected, result);
     }
 }

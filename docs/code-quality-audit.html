@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GetFiles — Code Quality &amp; Simplicity Audit</title>
+<style>
+  :root{
+    --ink:#1a1714;
+    --ink-soft:#4d463f;
+    --ink-faint:#857c70;
+    --paper:#fbf9f5;
+    --paper-raise:#ffffff;
+    --line:#e6e0d6;
+    --line-strong:#d4ccbe;
+    --accent:#1f5c8c;
+    --accent-soft:#e7f0f7;
+    --med:#b3650e;       --med-bg:#fbeedd;   --med-line:#eccfa6;
+    --low:#3a6b8a;       --low-bg:#e8f1f6;    --low-line:#c2d9e6;
+    --info:#6c6357;      --info-bg:#efebe3;   --info-line:#ddd5c7;
+    --good:#2f6b4f;      --good-bg:#e6f1ea;   --good-line:#bcdcc8;
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.6;
+    font-feature-settings:"kern" 1,"liga" 1;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:0 28px}
+
+  /* ── Masthead ─────────────────────────────────────────── */
+  header.mast{padding:64px 0 36px;border-bottom:2px solid var(--ink)}
+  .kicker{font-family:var(--mono);font-size:12.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(34px,6vw,54px);line-height:1.04;margin:0 0 14px;letter-spacing:-.01em}
+  .dek{font-size:19px;color:var(--ink-soft);max-width:60ch;margin:0}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:30px;font-size:13.5px;color:var(--ink-faint);font-family:var(--mono)}
+  .meta b{color:var(--ink-soft);font-weight:600}
+
+  /* ── Section scaffolding ─────────────────────────────── */
+  section{padding:46px 0;border-bottom:1px solid var(--line)}
+  .sec-label{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 6px}
+  h2{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.12;margin:0 0 20px;letter-spacing:-.01em}
+  h3{font-family:var(--serif);font-weight:600;font-size:21px;margin:34px 0 12px}
+  p{margin:0 0 16px}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--low-line)}
+  strong{font-weight:650}
+  code{font-family:var(--mono);font-size:.88em;background:var(--paper-raise);border:1px solid var(--line);border-radius:4px;padding:.08em .36em;white-space:nowrap}
+
+  .lede{font-size:18px;color:var(--ink-soft)}
+  .lede strong{color:var(--ink)}
+
+  /* ── Verdict banner ──────────────────────────────────── */
+  .verdict{background:var(--paper-raise);border:1px solid var(--line-strong);border-left:4px solid var(--accent);border-radius:6px;padding:22px 24px;margin:8px 0 4px}
+  .verdict p{margin:0}
+  .verdict p+p{margin-top:12px}
+
+  /* ── Stat scorecard ──────────────────────────────────── */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:6px 0 30px}
+  .card{background:var(--paper-raise);border:1px solid var(--line);border-radius:8px;padding:16px 16px 14px;text-align:center}
+  .card .n{font-family:var(--serif);font-size:38px;font-weight:600;line-height:1;color:var(--ink)}
+  .card .l{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-top:8px}
+  .card.green .n{color:var(--good)}
+  .card.med .n{color:var(--med)}
+  .card.low .n{color:var(--low)}
+  .card.info .n{color:var(--info)}
+
+  .barwrap{margin:18px 0 4px}
+  .barrow{display:grid;grid-template-columns:120px 1fr 38px;align-items:center;gap:14px;margin-bottom:9px;font-size:13.5px}
+  .barrow .cat{font-family:var(--mono);font-size:12px;color:var(--ink-soft);text-align:right}
+  .track{height:12px;background:var(--paper-raise);border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .fill{height:100%;background:var(--accent);border-radius:7px 0 0 7px}
+  .barrow .v{font-family:var(--mono);font-size:12px;color:var(--ink-faint)}
+
+  /* ── Findings ────────────────────────────────────────── */
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 26px}
+  .pill{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;padding:4px 11px;border-radius:20px;border:1px solid}
+  .pill .dot{width:8px;height:8px;border-radius:50%}
+  .pill.med{background:var(--med-bg);border-color:var(--med-line);color:var(--med)} .pill.med .dot{background:var(--med)}
+  .pill.low{background:var(--low-bg);border-color:var(--low-line);color:var(--low)} .pill.low .dot{background:var(--low)}
+  .pill.info{background:var(--info-bg);border-color:var(--info-line);color:var(--info)} .pill.info .dot{background:var(--info)}
+  .pill.good{background:var(--good-bg);border-color:var(--good-line);color:var(--good)} .pill.good .dot{background:var(--good)}
+
+  .find{background:var(--paper-raise);border:1px solid var(--line);border-radius:9px;padding:0;margin:0 0 18px;overflow:hidden}
+  .find>.head{display:flex;align-items:flex-start;gap:14px;padding:18px 22px 14px;border-bottom:1px solid var(--line)}
+  .find .idx{font-family:var(--mono);font-size:13px;color:var(--ink-faint);padding-top:3px;min-width:30px}
+  .find .htitle{flex:1}
+  .find .htitle h4{margin:0;font-size:17.5px;font-weight:650;line-height:1.28;letter-spacing:-.005em}
+  .find .loc{font-family:var(--mono);font-size:12px;color:var(--ink-faint);margin-top:7px;word-break:break-word}
+  .find .sev{flex-shrink:0}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;padding:4px 9px;border-radius:5px;border:1px solid;white-space:nowrap}
+  .badge .dot{width:7px;height:7px;border-radius:50%}
+  .badge.med{background:var(--med-bg);border-color:var(--med-line);color:var(--med)} .badge.med .dot{background:var(--med)}
+  .badge.low{background:var(--low-bg);border-color:var(--low-line);color:var(--low)} .badge.low .dot{background:var(--low)}
+  .badge.info{background:var(--info-bg);border-color:var(--info-line);color:var(--info)} .badge.info .dot{background:var(--info)}
+
+  .find>.body{padding:16px 22px 20px}
+  .find .row{margin-bottom:13px}
+  .find .row:last-child{margin-bottom:0}
+  .find .rl{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);display:block;margin-bottom:4px}
+  .find .rt{font-size:14.5px;color:var(--ink-soft);margin:0}
+  .find .rt strong{color:var(--ink)}
+  .verify{font-size:13px;color:var(--ink-faint);border-top:1px dashed var(--line-strong);margin-top:14px;padding-top:11px}
+  .verify b{color:var(--good);font-weight:650;font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+  .verify.partial b{color:var(--med)}
+
+  /* code repro block */
+  pre.repro{font-family:var(--mono);font-size:12.5px;line-height:1.65;background:#201b16;color:#e9e2d6;border-radius:8px;padding:16px 18px;overflow-x:auto;margin:6px 0 0}
+  pre.repro .in{color:#9fb8c9}
+  pre.repro .out{color:#e0a86b}
+  pre.repro .x{color:#d97b6c;font-weight:700}
+  pre.repro .ok{color:#8fc6a3}
+  pre.repro .cm{color:#7c7468}
+
+  /* good list */
+  ul.clean{list-style:none;margin:0;padding:0}
+  ul.clean li{position:relative;padding:11px 0 11px 30px;border-bottom:1px solid var(--line);font-size:15px;color:var(--ink-soft)}
+  ul.clean li:last-child{border-bottom:none}
+  ul.clean li:before{content:"";position:absolute;left:4px;top:18px;width:9px;height:9px;border-radius:50%;background:var(--good)}
+  ul.clean li strong{color:var(--ink)}
+
+  /* priority table */
+  table.pri{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px}
+  table.pri th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);font-weight:500;padding:8px 12px;border-bottom:2px solid var(--line-strong)}
+  table.pri td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-soft)}
+  table.pri td:first-child{font-family:var(--mono);font-size:12px;color:var(--ink-faint);white-space:nowrap}
+  table.pri td strong{color:var(--ink)}
+  table.pri tr:last-child td{border-bottom:none}
+
+  .note{font-size:13px;color:var(--ink-faint);font-style:italic;margin-top:18px}
+  footer{padding:40px 0 70px;color:var(--ink-faint);font-size:13px;font-family:var(--mono)}
+  footer a{color:var(--ink-faint);border-bottom-color:var(--line-strong)}
+
+  @media (max-width:680px){
+    .cards{grid-template-columns:repeat(2,1fr)}
+    .barrow{grid-template-columns:88px 1fr 32px}
+    .find>.head{flex-wrap:wrap}
+    .meta{gap:6px 18px}
+  }
+  @media print{
+    body{background:#fff}
+    .find,.card,.verdict,pre.repro{break-inside:avoid}
+    section{border-color:#ddd}
+  }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <p class="kicker">Code Quality &amp; Radical-Simplicity Audit</p>
+    <h1>GetFiles</h1>
+    <p class="dek">A read of the <code>gf</code> .NET CLI (package <code>GetFiles</code>) for dead code, unnecessary complexity, and how simple the implementation could be while still meeting its specification.</p>
+    <div class="meta">
+      <span><b>Date</b> 2026-06-28</span>
+      <span><b>Reconciled</b> HEAD 735588d · v1.3.0</span>
+      <span><b>Build</b> green · 78/78 tests pass</span>
+      <span><b>Method</b> 45-agent verified audit</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── EXECUTIVE SUMMARY ─────────────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">01 — Executive Summary</p>
+    <h2>A clean, well-tested tool carrying spec-mandated weight — with a handful of real stripper bugs</h2>
+
+    <div class="verdict" style="border-left-color:var(--good);margin:0 0 26px">
+      <p><strong>Reconciled to commit 735588d (v1.3.0).</strong> This audit was first run against baseline <code>de914ac</code>. The repository has since advanced five commits — the CLI command was renamed <code>get-files → gf</code>, short aliases <code>-p</code>/<code>-o</code>/<code>-i</code> were added, and <code>aggregate</code> became the default command. A <code>git diff</code> confirms those commits touch only three code files (<code>Program.cs</code>, <code>AggregateCommand.cs</code>, <code>GetFiles.csproj</code>) plus docs — <strong>the entire <code>Services/</code> layer and <code>AggregateCommandHandler</code> are byte-for-byte unchanged.</strong> Every recommendation below therefore still stands as written: all correctness bugs (C1–C6) and simplifications live in that untouched layer, and the test suite still reports <strong>78/78 passing</strong> on the current HEAD. The only effects of the rename are cosmetic (a few line numbers in the two changed CLI files shifted by ≤3 lines, flagged inline) plus one newly-introduced coverage gap — the <code>gf</code>/alias/default-command behavior shipped untested (see <strong>R4</strong>).</p>
+    </div>
+
+    <p class="lede">GetFiles does one thing: walk a repository, filter it, and concatenate the source into a single LLM-ready text file. The code is <strong>genuinely well-organized</strong> — clear separation of concerns, an interface per service, descriptive naming, and a thorough 78-test suite that <strong>all passes</strong>. There is no rot here and very little true dead code.</p>
+
+    <div class="verdict">
+      <p><strong>Verdict.</strong> The biggest source of complexity is <em>not</em> the engineer's choices — it is the specification itself. The L1/L2 specs mandate a full <code>Microsoft.Extensions</code> dependency-injection container, a logging abstraction, an <code>IConfiguration</code>/<code>appsettings.json</code> subsystem, an interface per service, and a command-per-file layout for what is effectively a ~300-line single-command utility. The code faithfully implements all of it. The result is a lot of well-built scaffolding around a small amount of actual work.</p>
+      <p>The defects that matter are concentrated in one place: the <strong>comment stripper</strong>. Run by default, it silently corrupts valid CSS/SCSS (unquoted URLs) and multi-line C# verbatim strings in the output it hands to the model. These are real, reproduced, and untested — and they are the findings most worth fixing.</p>
+    </div>
+
+    <div class="cards">
+      <div class="card green"><div class="n">78</div><div class="l">Tests passing</div></div>
+      <div class="card med"><div class="n">5</div><div class="l">Medium findings</div></div>
+      <div class="card low"><div class="n">16</div><div class="l">Low findings</div></div>
+      <div class="card info"><div class="n">8</div><div class="l">Info / nits</div></div>
+    </div>
+    <p class="note">29 distinct issues — 28 consolidated from 40 independently-verified findings across five audit dimensions, plus <strong>R4</strong> added on reconciliation to v1.3.0. Every original finding survived an adversarial verification pass (a second agent that tried to refute it against the real source); the few that were over-stated are flagged <em>Partial</em> with the correction inline. No finding contradicts the green test suite — all describe inputs or paths the tests do not cover.</p>
+
+    <div class="barwrap">
+      <div class="barrow"><span class="cat">over-complexity</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="v">10</span></div>
+      <div class="barrow"><span class="cat">dead-code</span><div class="track"><div class="fill" style="width:90%"></div></div><span class="v">9</span></div>
+      <div class="barrow"><span class="cat">readability</span><div class="track"><div class="fill" style="width:90%"></div></div><span class="v">9</span></div>
+      <div class="barrow"><span class="cat">correctness</span><div class="track"><div class="fill" style="width:80%"></div></div><span class="v">8</span></div>
+      <div class="barrow"><span class="cat">requirements</span><div class="track"><div class="fill" style="width:40%"></div></div><span class="v">4</span></div>
+    </div>
+    <p class="note">Raw verified-finding counts by audit lens (before de-duplication). Over-complexity and dead-code dominate — consistent with "well-built but heavier than the problem needs."</p>
+  </div>
+</section>
+
+<!-- ── THE CENTRAL QUESTION ──────────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">02 — The Central Question</p>
+    <h2>How radically simpler could this be?</h2>
+
+    <p>The user's question — "could this be a radically simpler implementation while still meeting the requirements?" — splits cleanly in two, because most of the weight is <strong>load-bearing against the spec, not against the problem</strong>.</p>
+
+    <h3>If the spec is held fixed</h3>
+    <p>Very little can be removed. L1-1 / L2-1.1–1.3 explicitly require the DI container, the logging abstraction, the configuration wiring, the interface-per-service pattern, and command-per-file. The smoke tests even pin the redundant <code>--strip-comments</code>/<code>--no-strip-comments</code> flag pair. Within those constraints the realistic wins are the bug fixes, the dead-code deletions that the spec doesn't actually mandate (an unused <code>using</code>, an unused test helper, redundant <code>ToLowerInvariant</code>), and the internal simplification of two over-built methods.</p>
+
+    <h3>If the spec could be relaxed</h3>
+    <p>The same user-facing behavior fits in roughly <strong>a third of the code</strong>: a single <code>Program.cs</code> using <code>Directory.EnumerateFiles</code>, two or three static helpers (<code>StripComments</code>, <code>StripWhitespace</code>, discovery), <code>Console.WriteLine</code> for the three summary stats, and <code>System.CommandLine</code> kept purely for argument parsing. No <code>ServiceProvider</code>, no <code>ILogger</code>, no <code>IConfiguration</code>, no four single-implementation interfaces. Worth keeping even then: <code>ICommentStripper</code> and <code>IWhitespaceStripper</code>, because the tests genuinely exploit them as seams (the other two interfaces are never substituted).</p>
+
+    <p>There is even a tension inside the project's own marketing: the README sells GetFiles as <em>"dependency-light"</em> with <em>"zero ceremony"</em> (README.md:7, 51) while the spec forces a stack of <code>Microsoft.Extensions.*</code> packages plus an unused configuration subsystem. The honest framing: <strong>the heaviness is a packaging decision, not a functional requirement.</strong></p>
+  </div>
+</section>
+
+<!-- ── CORRECTNESS ───────────────────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">03 — Findings: Correctness</p>
+    <h2>Bugs that silently corrupt the output</h2>
+    <p>The tool never rewrites source files — it only writes the aggregated copy — so these are recoverable with <code>--no-strip-comments</code>. But they fire <strong>by default</strong>, on idiomatic input, and no test guards them.</p>
+
+    <div class="legend">
+      <span class="pill med"><span class="dot"></span>Medium</span>
+      <span class="pill low"><span class="dot"></span>Low</span>
+      <span class="pill info"><span class="dot"></span>Info</span>
+      <span class="pill good"><span class="dot"></span>Confirmed by verifier</span>
+    </div>
+
+    <!-- C1 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">C1</span>
+        <span class="htitle">
+          <h4>Unquoted <code>url(//…)</code> in CSS/SCSS is eaten as a <code>//</code> line comment</h4>
+          <div class="loc">Services/CommentStripper.cs:14 (.css/.scss in CStyleExtensions), 56–64 (// branch)</div>
+        </span>
+        <span class="sev"><span class="badge med"><span class="dot"></span>Medium</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt"><code>.css</code> and <code>.scss</code> route through the C-style stripper, which treats any <code>//</code> outside a quoted string as a single-line comment and deletes to end of line. But CSS has <strong>no <code>//</code> comments at all</strong>, and unquoted URLs (CDN backgrounds, web fonts, <code>@import</code>) routinely contain <code>//</code>. The state machine only protects <em>quoted</em> strings, so the URL token is unprotected — and a minified single-line stylesheet can lose its <em>entire</em> remainder.</p></div>
+        <div class="row"><span class="rl">Reproduced against the real CommentStripper</span>
+          <pre class="repro"><span class="cm">// .scss</span>
+<span class="in">IN  </span> body { background: url(http://cdn.example.com/bg.png); }
+<span class="out">OUT </span> body { background: url(http:          <span class="x">← rest of rule deleted</span>
+
+<span class="cm">// .css — protocol-relative @import</span>
+<span class="in">IN  </span> @import url(//cdn.example.com/reset.css);
+<span class="out">OUT </span> @import url(                          <span class="x">← truncated</span></pre>
+        </div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">CSS legitimately has only <code>/* */</code> — drop <code>.css</code> from the <code>//</code> path and strip block comments only. SCSS does support <code>//</code>, so keep it, but guard <code>url(</code> tokens (skip to the matching <code>)</code>) so absolute/protocol-relative URLs survive.</p></div>
+        <div class="verify"><b>Confirmed</b> — Reproduced by three independent agents against the compiled stripper; quoted <code>url("http://…")</code> survives via the string-literal branch, exactly scoping the defect to unquoted URLs. The only CSS test uses <code>/* */</code>, so the suite has no guard here.</div>
+      </div>
+    </div>
+
+    <!-- C2 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">C2</span>
+        <span class="htitle">
+          <h4>C# multi-line verbatim strings <code>@"…"</code> are misparsed; embedded <code>//</code> lines get deleted</h4>
+          <div class="loc">Services/CommentStripper.cs:50–54, 124–130 (EmitStringLiteral)</div>
+        </span>
+        <span class="sev"><span class="badge med"><span class="dot"></span>Medium</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">The string scanner has no verbatim-string (<code>@"</code>) awareness. A verbatim string legally spans real newlines, but <code>EmitStringLiteral</code> treats a newline as ending the string (line 126). After the first physical newline, the remaining lines are parsed as <em>code</em>, so any embedded <code>//</code> (a URL, a UNC path, a regex) triggers line-comment deletion. Embedding JSON/SQL/XML in <code>@"…"</code> is extremely common in C#.</p></div>
+        <div class="row"><span class="rl">Demonstrated</span><p class="rt">A multi-line <code>@"{ ""url"": ""http://example.com"" }"</code> truncates at <code>http:</code>, dropping the rest. (Note: the failure requires <em>real</em> newlines in the literal — a single physical line with literal <code>\n</code> characters is preserved.)</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Detect the verbatim prefix (<code>@"</code>, <code>$@"</code>, <code>@$"</code>) before the opening quote; in verbatim mode, do not terminate on newline and treat <code>""</code> (doubled quote), not backslash, as the escape. Tracking the <code>@</code> prefix also resolves C3.</p></div>
+        <div class="verify partial"><b>Partial</b> — Root cause and behavior confirmed empirically; severity trimmed from High to Medium because the original file is untouched, <code>--no-strip-comments</code> is a full workaround, and the newline-terminates heuristic is actually correct for normal (non-verbatim) C# strings.</div>
+      </div>
+    </div>
+
+    <!-- C3 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">C3</span>
+        <span class="htitle">
+          <h4>Verbatim string ending in a backslash <code>@"C:\temp\"</code> consumes its own closing quote</h4>
+          <div class="loc">Services/CommentStripper.cs:109–122</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">For <code>var dir = @"C:\temp\"; // comment</code>, the trailing path backslash plus the closing quote (<code>\"</code>) is read as an escaped quote, swallowing the real terminator. The trailing comment survives un-stripped and same-line tokenization can scramble. Same root cause as C2 (no verbatim awareness).</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Same fix as C2 — verbatim strings don't honor backslash escapes.</p></div>
+        <div class="verify"><b>Confirmed</b> — Output is byte-identical to input (comment retained). No source characters dropped in the common single-line case, hence Low.</div>
+      </div>
+    </div>
+
+    <!-- C4 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">C4</span>
+        <span class="htitle">
+          <h4>Nested <code>.gitignore</code> negation (<code>!keep.ts</code>) is broken — re-included files are wrongly dropped</h4>
+          <div class="loc">Services/FileDiscoveryService.cs:150–162</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">When prefixing a nested pattern with its directory, <code>!keep.ts</code> becomes <code>src/foo/!keep.ts</code> — the <code>!</code> is no longer leading, so the <code>Ignore</code> library treats it as a literal filename rather than a negation. The file stays ignored. Reproduced: a nested <code>.gitignore</code> with <code>*.ts</code> + <code>!keep.ts</code> drops <strong>both</strong> files.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Preserve the leading <code>!</code>: strip it, prefix the remainder with the relative dir, then re-prepend <code>!</code> → <code>!src/foo/keep.ts</code>.</p></div>
+        <div class="verify"><b>Confirmed</b> — Reproduced via a probe against the real <code>DiscoverFiles</code>. Narrow trigger (nested gitignore + negation), and common generated dirs are hardcoded-excluded before gitignore runs, so Low — but it is genuine silent data loss.</div>
+      </div>
+    </div>
+
+    <!-- C5 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">C5</span>
+        <span class="htitle">
+          <h4>Aggregated output is written with a UTF-8 BOM</h4>
+          <div class="loc">Services/CodeAggregatorService.cs:36</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt"><code>Encoding.UTF8</code> emits a BOM, so the output file starts with bytes <code>EF BB BF</code> before the first <code>=== FILE: …</code> — a stray U+FEFF at the head of the LLM payload. (Per-file input BOMs are stripped by <code>ReadAllText</code>, so only the single leading one appears.)</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Pass <code>new UTF8Encoding(false)</code> to the <code>StreamWriter</code>.</p></div>
+        <div class="verify"><b>Confirmed</b> — First bytes verified as <code>EF BB BF 3D 3D 3D</code>. Tolerated by most tooling, hence Low.</div>
+      </div>
+    </div>
+
+    <!-- C6 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">C6</span>
+        <span class="htitle">
+          <h4><code>CountLines</code> over-counts a trailing newline (logged stat off by one per file)</h4>
+          <div class="loc">Services/CodeAggregatorService.cs:82–95</div>
+        </span>
+        <span class="sev"><span class="badge info"><span class="dot"></span>Info</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt"><code>1 + count('\n')</code> reports 3 for <code>"A\nB\n"</code> (two content lines + trailing newline). Most files end in a newline, so the "Total lines of code" log is systematically one-per-file high. Diagnostic only — the output file is unaffected.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Subtract 1 when <code>content.EndsWith('\n')</code>, if a trailing newline shouldn't count.</p></div>
+        <div class="verify"><b>Confirmed</b> — Affects only the logged stat (line 78). Trivial.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── OVER-COMPLEXITY ───────────────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">04 — Findings: Unnecessary Complexity</p>
+    <h2>Heavier than the problem needs</h2>
+
+    <!-- X1 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">X1</span>
+        <span class="htitle">
+          <h4>Spec-mandated DI + Config + Logging + interface-per-service is disproportionate for a single-command concat tool</h4>
+          <div class="loc">Program.cs:1–61; Services/I*.cs (×4); Commands/*</div>
+        </span>
+        <span class="sev"><span class="badge med"><span class="dot"></span>Medium</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Observation</span><p class="rt">A full <code>Microsoft.Extensions</code> DI container, a logging abstraction used for ~9 status lines, a configuration subsystem with <strong>zero consumers</strong>, four single-implementation interfaces, and command-per-file for exactly one command. All of it is mandated by L1-1 / L2-1.x, so it is required — but it is ceremony around a small amount of real work.</p></div>
+        <div class="row"><span class="rl">Radically simpler shape (spec relaxed)</span><p class="rt">One <code>Program.cs</code> + 2–3 static helpers, <code>Directory.EnumerateFiles</code>, <code>Console.WriteLine</code> for stats, <code>System.CommandLine</code> for parsing only. No ServiceProvider, ILogger, IConfiguration, or interfaces (keep <code>ICommentStripper</code>/<code>IWhitespaceStripper</code> as test seams). ~⅓ the code, far fewer dependencies, identical behavior.</p></div>
+        <div class="verify"><b>Confirmed</b> — Directly answers the audit question. The simpler form meets <em>functional</em> but not <em>structural</em> requirements, so it is conditional on the spec relaxing — disclosed, not hidden.</div>
+      </div>
+    </div>
+
+    <!-- X2 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">X2</span>
+        <span class="htitle">
+          <h4>Four boolean strip flags encode two toggles; the handler takes 7 parameters</h4>
+          <div class="loc">Commands/AggregateCommand.cs:27–45 (+2 since v1.2.0 aliases); Program.cs:47–54; AggregateCommandHandler.cs:30,34–35 (unchanged)</div>
+        </span>
+        <span class="sev"><span class="badge med"><span class="dot"></span>Medium</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">Both <code>--strip-comments</code> (default true) <em>and</em> <code>--no-strip-comments</code> (default false) exist, same for whitespace = 4 options. <code>Program.cs</code> reads six options and <code>Execute</code> takes seven parameters (four booleans) before collapsing them to <code>strip &amp;&amp; !noStrip</code>. Two disable paths, an ambiguous "both flags set" case resolved silently, and a bloated signature.</p></div>
+        <div class="row"><span class="rl">Minimal model</span><p class="rt">A single negative flag per feature (<code>--no-strip-comments</code>, default false) with <code>effective = !noStrip</code> satisfies every L2-4.1/4.2 acceptance criterion and removes 2 options + 2 parameters.</p></div>
+        <div class="verify partial"><b>Confirmed, but spec-blocked</b> — L2-4.1/4.2 literally name the positive <code>--strip-comments</code> flag, and three smoke tests assert it exists and defaults true. So this is <em>mandated</em> redundancy: flag it, don't silently delete it. At minimum, warn on contradictory flags instead of resolving to "off" silently.</div>
+      </div>
+    </div>
+
+    <!-- X3 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">X3</span>
+        <span class="htitle">
+          <h4><code>WhitespaceStripper</code> emits-then-back-patches with a 20-line comment that reasons aloud</h4>
+          <div class="loc">Services/WhitespaceStripper.cs:25–78 (hack &amp; comment at 43–66)</div>
+        </span>
+        <span class="sev"><span class="badge med"><span class="dot"></span>Medium</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">Blank-line newlines are emitted optimistically, then a later content line surgically removes one via <code>sb.Remove(sb.Length - ending.Length, ending.Length)</code>. It needs a ~14-line comment block — including the literal line <code>// Actually, let's simplify:</code> — to justify the off-by-one. That self-doubt in the source is the tell: a comment compensating for unclear code. The <code>&lt;= 2</code> / <code>&gt;= 3</code> thresholds are unexplained magic literals.</p></div>
+        <div class="row"><span class="rl">Verified simpler replacement (~16 lines)</span><p class="rt">Defer blank emission instead of back-patching: trim each line, count a pending blank run, and flush it sized <code>pending&gt;=3 ? 1 : pending</code> before each content line (trailing run capped at <code>Min(pending,2)</code>), then <code>string.Join</code>. An agent compiled this and ran it against <strong>all 15 whitespace tests — 0 failures</strong>, including the CRLF and all-blank edges.</p></div>
+        <div class="verify partial"><b>Confirmed (with a caveat worth heeding)</b> — The deferred-list rewrite is verified equivalent. <strong>Do not</strong> reach for the tempting one-line regex <code>(\r?\n){3,}→$1$1</code> that another agent proposed: it was tested and <em>fails two tests</em> — the rule is "3+ <em>blank lines</em> (= 4+ newlines)", not 3+ newlines, plus edge-blank trimming.</div>
+      </div>
+    </div>
+
+    <!-- X4 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">X4</span>
+        <span class="htitle">
+          <h4><code>BuildIgnoreFilter</code> re-skips comments/blanks the library already handles</h4>
+          <div class="loc">Services/FileDiscoveryService.cs:120–173</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">The method manually trims and skips <code>#</code>/blank lines before <code>ignore.Add</code>. A probe against <code>Ignore 0.1.50</code> shows the library <em>already</em> ignores comment and blank lines — so that loop (~5 lines) is redundant.</p></div>
+        <div class="row"><span class="rl">Important caveat</span><p class="rt">The <strong>nested-pattern prefixing is NOT redundant</strong>. A verifier probe proved that an un-prefixed no-slash pattern (<code>output.ts</code>) wrongly matches same-named files in the root and siblings; the prefixing is load-bearing correctness. The original "collapse to ~6 lines of raw <code>Add</code>" suggestion would introduce an over-ignore regression — keep the prefix logic (and fix C4's <code>!</code> handling).</p></div>
+        <div class="verify partial"><b>Partial</b> — Only the comment/blank-skip loop is true redundancy; the prefix branch must stay.</div>
+      </div>
+    </div>
+
+    <!-- X5 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">X5</span>
+        <span class="htitle">
+          <h4><code>IsInExcludedDirectory</code> and <code>IsInUserIgnoredDirectory</code> are duplicate segment scanners</h4>
+          <div class="loc">Services/FileDiscoveryService.cs:178–205</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">Both methods are identical save for the set they consult — even the <code>// Skip the last segment</code> comment is duplicated.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">One helper <code>PathHasSegmentIn(string path, IReadOnlySet&lt;string&gt; names)</code> serves all three call sites (both <code>ExcludedDirectories</code> and the user set are <code>IReadOnlySet&lt;string&gt;</code>). Removes ~13 lines.</p></div>
+        <div class="verify"><b>Confirmed</b> — Type-compatible unification, no behavior change.</div>
+      </div>
+    </div>
+
+    <!-- X6 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">X6</span>
+        <span class="htitle">
+          <h4><code>CountLines</code> hand-rolls a char loop where a one-liner suffices</h4>
+          <div class="loc">Services/CodeAggregatorService.cs:82–95</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Fix</span><p class="rt">Replace the 14-line loop with <code>content.AsSpan().Count('\n') + 1</code> (keeping the empty-string guard). <code>MemoryExtensions.Count</code> is available on .NET 8. (Combine with the C6 trailing-newline fix.)</p></div>
+        <div class="verify"><b>Confirmed</b> — Identical result; the loop isn't wrong, just verbose.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── DEAD CODE ─────────────────────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">05 — Findings: Dead &amp; Unused Code</p>
+    <h2>What's wired but never runs</h2>
+
+    <!-- D1 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">D1</span>
+        <span class="htitle">
+          <h4>The entire <code>IConfiguration</code> / <code>appsettings.json</code> subsystem is wired but never consumed</h4>
+          <div class="loc">Program.cs:10–13,18; GetFiles.csproj:32–33,37–39</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">A <code>ConfigurationBuilder</code> loads <code>appsettings.json</code> and registers <code>IConfiguration</code> as a singleton — but <strong>no constructor anywhere injects it</strong> (grep across <code>src</code> returns only the registration line), and <strong>no <code>appsettings.json</code> file exists</strong> in the repo, so the <code>None Include … Condition="Exists(…)"</code> item is a permanent no-op. Two NuGet packages (<code>Microsoft.Extensions.Configuration</code> + <code>.Json</code>) exist solely to feed a dead object.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Spec-relaxed: delete the builder, the registration, the two packages, and the csproj item. Spec-as-is (L2-1.2 mandates the wiring): make it <em>earn</em> its place by binding the log level from config — see D2 — so the ceremony does something.</p></div>
+        <div class="verify"><b>Confirmed</b> — Four agents independently traced every consumer to zero. Severity corrected down from High to Low: inert, no runtime impact, and spec-mandated.</div>
+      </div>
+    </div>
+
+    <!-- D2 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">D2</span>
+        <span class="htitle">
+          <h4>All four <code>LogDebug</code> calls are unreachable — min level is hardcoded and never bound to config</h4>
+          <div class="loc">Program.cs:23; FileDiscoveryService.cs:84,101,128,169</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt"><code>SetMinimumLevel(LogLevel.Information)</code> is a literal, and config is never read into the logger, so the four <code>LogDebug</code> "why was this file excluded?" diagnostics can never emit. Users lose exactly the visibility those lines were written to provide.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Bind <code>builder.AddConfiguration(configuration.GetSection("Logging"))</code> (gives D1 a purpose), or add a <code>--verbose</code>/<code>--quiet</code> flag mapping to Debug/Warning.</p></div>
+        <div class="verify"><b>Confirmed</b> — No code path can lower the level. Cosmetic/no-op, hence Low.</div>
+      </div>
+    </div>
+
+    <!-- D3 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">D3</span>
+        <span class="htitle">
+          <h4>Two service interfaces are unused seams; the handler they decouple is never tested</h4>
+          <div class="loc">Services/IFileDiscoveryService.cs; ICodeAggregatorService.cs; AggregateCommandHandler.cs</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt"><code>IFileDiscoveryService</code> and <code>ICodeAggregatorService</code> have one implementation, one caller, and are never mocked (no Moq/NSubstitute in the test project). <code>AggregateCommandHandler</code> — the only thing that would benefit from the seam — has no unit test. By contrast, <code>ICommentStripper</code>/<code>IWhitespaceStripper</code> <strong>do</strong> earn their keep: the aggregator tests substitute <code>StubCommentStripper</code>/<code>StubWhitespaceStripper</code>.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Spec-relaxed: inject the concretes and delete the two unused interfaces; keep the two that are genuinely used as test seams.</p></div>
+        <div class="verify"><b>Confirmed</b> — Grep across tests returns zero stubs/mocks of these two interfaces.</div>
+      </div>
+    </div>
+
+    <!-- D4 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">D4</span>
+        <span class="htitle">
+          <h4><code>.js</code> support exists in the stripper but is unreachable through discovery</h4>
+          <div class="loc">CommentStripper.cs:14,43 vs FileDiscoveryService.cs:16–28</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt"><code>CStyleExtensions</code> includes <code>.js</code> (with template-literal handling and a dedicated test), but <code>IncludedExtensions</code> has only <code>.ts</code>. Discovery never yields a <code>.js</code> file, so the branch is reachable only from unit tests. Two separately-maintained extension lists that already disagree — a maintenance trap.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Pick one: add <code>.js</code> (and likely <code>.mjs</code>/<code>.cjs</code>) to <code>IncludedExtensions</code> if JS aggregation is intended, or drop it from <code>CStyleExtensions</code>. Longer term, derive both lists from one <code>extension → language</code> registry so they can't drift (see R3).</p></div>
+        <div class="verify"><b>Confirmed</b> — Path traced dead through the real pipeline. (L1-4's "TypeScript/JavaScript" refers to a shared comment <em>syntax</em>, not a discovery requirement, and the README correctly omits <code>.js</code> — so no requirement is violated, just an internal inconsistency.)</div>
+      </div>
+    </div>
+
+    <!-- D5 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">D5</span>
+        <span class="htitle">
+          <h4>Small dead items: an unused <code>using</code>, an unused test helper, a redundant <code>ToLowerInvariant</code></h4>
+          <div class="loc">AggregateCommandHandler.cs:1 · FileDiscoveryServiceTests.cs:41 · CommentStripper.cs:23,25</div>
+        </span>
+        <span class="sev"><span class="badge info"><span class="dot"></span>Info</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Items</span><p class="rt"><strong>(a)</strong> <code>using System.CommandLine.Invocation;</code> in <code>AggregateCommandHandler</code> is never referenced — delete it. <strong>(b)</strong> <code>NormalizePath</code> in <code>FileDiscoveryServiceTests</code> has zero call sites — delete it. <strong>(c)</strong> <code>fileExtension?.ToLowerInvariant()</code> is pointless before an <code>OrdinalIgnoreCase</code> HashSet lookup; the lowercased value is only load-bearing for the <code>== ".html"</code>/<code>== ".ts"</code> equality checks — switch those to <code>StringComparison.OrdinalIgnoreCase</code> and drop the normalization.</p></div>
+        <div class="verify"><b>Confirmed</b> — All three grep-verified as unreferenced / redundant. Pure cleanup, zero behavior change.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── READABILITY + REQUIREMENTS ────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">06 — Findings: Readability &amp; Requirements</p>
+    <h2>Maintainability nits and spec traceability</h2>
+
+    <!-- R1 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">R1</span>
+        <span class="htitle">
+          <h4>Forward-slash normalization <code>.Replace('\\','/')</code> is duplicated five times; <code>GetRelativePath</code> isn't shared</h4>
+          <div class="loc">FileDiscoveryService.cs:73,123,138,210–214; CodeAggregatorService.cs:41–42</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">The same "present paths with forward slashes" concern is smeared across two files with no shared name, and <code>FileDiscoveryService</code>'s private <code>GetRelativePath</code> helper is re-inlined verbatim in <code>CodeAggregatorService</code> because the helper isn't visible across the class boundary.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">One <code>internal static class PathUtil</code> with <code>ToForwardSlashes()</code> (and a shared relative-path helper); call it from both services. Single source of truth, call sites read as intent.</p></div>
+        <div class="verify"><b>Confirmed</b> — Five occurrences grep-verified; behavior-preserving.</div>
+      </div>
+    </div>
+
+    <!-- R2 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">R2</span>
+        <span class="htitle">
+          <h4>No end-to-end test proves stripping actually shrinks output (L2-4.3 AC-1 unverified)</h4>
+          <div class="loc">CodeAggregatorServiceTests.cs:36–185 (all stubbed)</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Problem</span><p class="rt">Every aggregator test injects stubs that return input unchanged, so they verify <em>wiring and ordering</em> only. The real strippers are never composed into a <code>CodeAggregatorService</code>, so L2-4.3 AC-1 ("both flags together produce smaller output than either alone") has no direct coverage. (The strippers <em>are</em> well-tested in isolation — this is a composition gap, not an untested unit.)</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Add one integration test with the real <code>new CommentStripper()</code> + <code>new WhitespaceStripper()</code> over a fixture containing comments and triple-blank lines, asserting <code>len(stripped) &lt; len(comments-only) &lt; len(raw)</code>. This would also have caught C1.</p></div>
+        <div class="verify partial"><b>Partial</b> — Real gap, but framed down from Medium: the strippers' shrink behavior is thoroughly proven by their own unit tests; only the composed assertion is missing.</div>
+      </div>
+    </div>
+
+    <!-- R3 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">R3</span>
+        <span class="htitle">
+          <h4>Spec/code drift &amp; magic literals: excluded-dir list, output delimiters, two extension lists</h4>
+          <div class="loc">L1-2 vs L2-2.3 · CodeAggregatorService.cs:60,66 · CommentStripper vs FileDiscoveryService</div>
+        </span>
+        <span class="sev"><span class="badge info"><span class="dot"></span>Info</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">Items</span><p class="rt"><strong>(a)</strong> L1-2 says the tool excludes only <code>node_modules</code> + <code>dist</code>; L2, the README, and the code all list five (<code>+bin, obj, .git</code>). Code matches L2/README — L1 is stale. <strong>(b)</strong> The load-bearing <code>=== FILE: … ===</code> / <code>=== END FILE: … ===</code> delimiters (the wire contract a downstream LLM parses) are inline literals, re-typed across 12 test assertions — hoist them to constants. <strong>(c)</strong> Two extension allow-lists (R-see-D4) are maintained separately and already disagree.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Update L1-2 to list all five (or "including but not limited to"); centralize the delimiter strings; derive discovery + strip-capability from one registry.</p></div>
+        <div class="verify"><b>Confirmed</b> — Documentation/traceability consistency; no functional defect. The verbosity AC (L2-1.2 AC-3, "configurable levels") is also only nominally met — see D2.</div>
+      </div>
+    </div>
+
+    <!-- R4 — added during reconciliation to v1.3.0 -->
+    <div class="find">
+      <div class="head">
+        <span class="idx">R4</span>
+        <span class="htitle">
+          <h4>New <code>gf</code> default-command &amp; alias behavior (L2-1.4, four ACs) shipped with no tests</h4>
+          <div class="loc">Program.cs:59–71 (default-command shim) · AggregateCommand.cs aliases · commits v1.1.0–v1.3.0 added no test files</div>
+        </span>
+        <span class="sev"><span class="badge low"><span class="dot"></span>Low</span></span>
+      </div>
+      <div class="body">
+        <div class="row"><span class="rl">New since the audit baseline</span><p class="rt">Commits v1.1.0–v1.3.0 added the <code>gf</code> rename, the <code>-p</code>/<code>-o</code>/<code>-i</code> aliases, and a hand-rolled default-command shim in <code>Program.cs</code> that prepends <code>"aggregate"</code> when the first argument isn't a known command or a passthrough flag (carrying its own <code>knownCommands</code> / <code>passthroughFlags</code> edge-case arrays). <code>docs/specs/L2.md</code> gained section <strong>L2-1.4 with four acceptance criteria</strong>: <code>gf -p ./repo</code> ≡ <code>gf aggregate -p ./repo</code>; <code>--help</code>/<code>--version</code> pass through to root; bare <code>gf</code> shows root help; aliases accepted. A <code>git diff</code> from the baseline shows <strong>zero test files changed</strong> — none of those ACs has an automated test.</p></div>
+        <div class="row"><span class="rl">Fix</span><p class="rt">Add smoke tests mirroring L2-1.4: assert <code>gf -p &lt;path&gt;</code> dispatches aggregate, <code>gf --help</code>/<code>--version</code> reach root help/version (rather than being parsed as aggregate options), bare <code>gf</code> prints root help, and <code>-p</code>/<code>-o</code>/<code>-i</code> parse. The arg-rewrite shim's branch logic is exactly the kind of thing that regresses silently without a guard.</p></div>
+        <div class="verify"><b>Confirmed</b> — Established by <code>git diff de914ac..HEAD</code>: the shim and aliases exist, L2-1.4 defines four ACs, and no test source changed. The behavior works today (78/78 pass) but the new surface is unguarded. Low — additive coverage gap, not a defect.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── WHAT'S GOOD ───────────────────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">07 — Strengths &amp; "Do Not Touch"</p>
+    <h2>What is already right</h2>
+    <p>An audit that only lists problems is misleading. This codebase has real quality, and one piece of it is a deliberate trap for a careless "simplify" pass:</p>
+    <ul class="clean">
+      <li><strong>The <code>CommentStripper</code> state machine is correctly complex — do not regex it.</strong> Its char-by-char scanner with escape handling and template-literal support is exactly what's needed to satisfy AC-4 (preserve <code>//</code> and <code>/* */</code> inside string literals). A naive <code>//.*</code> / <code>/\*.*?\*/</code> regex would regress five passing tests. Its bugs (C1–C3) are about <em>missing</em> language cases, not excess complexity.</li>
+      <li><strong>The test suite is thorough and well-isolated</strong> — 78 tests, theory-driven directory exclusions, stub-based aggregator isolation, explicit edge cases (CRLF, empty, null, escaped quotes). The gaps (R2, plus untested url()/verbatim/negation cases) are additions, not rewrites.</li>
+      <li><strong>Deterministic, sorted output</strong> with consistent forward-slash relative paths and clear delimiters — genuinely good for reproducible LLM input.</li>
+      <li><strong>Clear naming and tidy separation of concerns</strong> — discovery, aggregation, and the two strippers are each single-responsibility and easy to follow.</li>
+      <li><strong>The two genuinely-used interfaces</strong> (<code>ICommentStripper</code>, <code>IWhitespaceStripper</code>) are the right seams and should stay even in a slimmed-down version.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ── PRIORITIES ────────────────────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">08 — Recommended Order of Work</p>
+    <h2>If you fix nothing else, fix the stripper</h2>
+    <table class="pri">
+      <thead><tr><th>Priority</th><th>Action</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>1 · Now</td><td><strong>C1</strong> — Stop applying <code>//</code> stripping to <code>.css</code>; guard <code>url(</code> for <code>.scss</code>. Add the failing url() test.</td><td>Silent default corruption of a primary target file type (Angular SCSS/CSS).</td></tr>
+        <tr><td>2 · Now</td><td><strong>C2 / C3</strong> — Add verbatim-string awareness (<code>@"</code>, <code>""</code> escaping, no newline-terminate).</td><td>Default corruption of common multi-line C# string content.</td></tr>
+        <tr><td>3 · Soon</td><td><strong>C4</strong> — Preserve leading <code>!</code> when prefixing nested gitignore patterns. <strong>C5</strong> — drop the BOM.</td><td>Silent data loss (file dropped) and a stray U+FEFF in output.</td></tr>
+        <tr><td>4 · Cleanup</td><td><strong>D5</strong> + <strong>D1</strong>(if spec allows) — delete unused <code>using</code>, test helper, <code>ToLowerInvariant</code>, dead config wiring.</td><td>Zero-risk dead-code removal; smaller surface.</td></tr>
+        <tr><td>5 · Polish</td><td><strong>X3, X5, X6, R1</strong> — the verified deferred-blank rewrite, unify segment scanners, one-line CountLines, <code>PathUtil</code> helper.</td><td>Behavior-preserving clarity wins; X3 removes the self-doubting comment.</td></tr>
+        <tr><td>6 · Hardening</td><td><strong>R2</strong> + <strong>R4</strong> tests (stripping-shrink integration; <code>gf</code> default-command + aliases) · <strong>D2</strong> verbosity flag · <strong>R3</strong> doc/constant fixes.</td><td>Closes coverage and traceability gaps — including the untested v1.1–v1.3 CLI features — and makes the config ceremony earn its place.</td></tr>
+      </tbody>
+    </table>
+    <p class="note">"Radically simpler while meeting requirements": within the current spec, items 4–5 are the achievable simplifications (the deletions the spec doesn't mandate, plus internal method cleanups). The ~⅓-the-code rewrite (X1) is the answer to "if the spec could be relaxed" — a one-file tool with no DI/config/logging/interface ceremony delivers identical behavior.</p>
+  </div>
+</section>
+
+<!-- ── METHOD ────────────────────────────────────────────── -->
+<section>
+  <div class="wrap">
+    <p class="sec-label">09 — Methodology</p>
+    <h2>How this audit was produced</h2>
+    <p>Ground truth was established first: <code>dotnet build</code> succeeds and <code>dotnet test</code> reports <strong>78 passed / 0 failed</strong>, so nothing below claims the tool is broken — every finding describes an input or path the tests don't exercise.</p>
+    <p>Five audit agents then read the source in parallel, each through one lens — dead code, over-complexity, correctness, requirements fit, and readability. Every finding they produced was handed to an <strong>independent adversarial verifier</strong> instructed to refute it against the real code (compiling and running the actual <code>CommentStripper</code>/<code>FileDiscoveryService</code> where a claim was empirical). Findings that didn't hold up were dropped or down-graded; the surviving 40 were de-duplicated into the 28 issues here. <strong>45 agents</strong> participated in total. The two highest-stakes findings (C1, D1) were additionally reproduced by hand against the compiled binary.</p>
+    <p class="note">Adversarial verification mattered: it corrected several over-statements — e.g. a tempting regex rewrite of the whitespace logic that actually fails two tests (X3), and a "collapse <code>BuildIgnoreFilter</code>" suggestion whose prefix logic turned out to be load-bearing correctness (X4). Severities were re-graded down from the finders' initial "High" labels wherever impact was inert or recoverable.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    GetFiles code-quality &amp; simplicity audit · generated 2026-06-28 · reconciled to v1.3.0 (HEAD 735588d) · build green, 78/78 tests passing<br>
+    Scope: <a href="../backend/src/GetFiles">backend/src/GetFiles</a> + <a href="../backend/tests/GetFiles.Tests">tests</a> · against <a href="specs/L1.md">specs/L1</a> &amp; <a href="specs/L2.md">L2</a>
+  </div>
+</footer>
+
+</body>
+</html>

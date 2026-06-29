@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace GetFiles.Services;
@@ -7,6 +8,18 @@ namespace GetFiles.Services;
 /// </summary>
 public class CodeAggregatorService : ICodeAggregatorService
 {
+    // ── Output delimiters (the wire contract a downstream LLM parses) ──
+    // Defined once here so the format has a single source of truth.
+    internal const string FileHeaderPrefix = "=== FILE: ";
+    internal const string FileFooterPrefix = "=== END FILE: ";
+    internal const string DelimiterSuffix = " ===";
+
+    /// <summary>Builds the per-file header line, e.g. <c>=== FILE: src/A.cs ===</c>.</summary>
+    internal static string FileHeader(string relativePath) => $"{FileHeaderPrefix}{relativePath}{DelimiterSuffix}";
+
+    /// <summary>Builds the per-file footer line, e.g. <c>=== END FILE: src/A.cs ===</c>.</summary>
+    internal static string FileFooter(string relativePath) => $"{FileFooterPrefix}{relativePath}{DelimiterSuffix}";
+
     private readonly ILogger<CodeAggregatorService> _logger;
     private readonly ICommentStripper _commentStripper;
     private readonly IWhitespaceStripper _whitespaceStripper;
@@ -33,13 +46,15 @@ public class CodeAggregatorService : ICodeAggregatorService
             Directory.CreateDirectory(outputDirectory);
         }
 
-        using (var writer = new StreamWriter(outputPath, append: false, encoding: System.Text.Encoding.UTF8))
+        // UTF-8 without a BOM: avoid a stray U+FEFF at the head of the LLM payload.
+        var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
+        using (var writer = new StreamWriter(outputPath, append: false, encoding))
         {
             for (var i = 0; i < files.Count; i++)
             {
                 var filePath = files[i];
-                var relativePath = Path.GetRelativePath(repositoryPath, filePath)
-                    .Replace('\\', '/');
+                var relativePath = PathUtil.GetRelativePath(repositoryPath, filePath);
 
                 var content = File.ReadAllText(filePath);
 
@@ -57,13 +72,13 @@ public class CodeAggregatorService : ICodeAggregatorService
                 var lineCount = CountLines(content);
                 totalLines += lineCount;
 
-                writer.WriteLine($"=== FILE: {relativePath} ===");
+                writer.WriteLine(FileHeader(relativePath));
                 writer.Write(content);
                 if (content.Length > 0 && !content.EndsWith('\n'))
                 {
                     writer.WriteLine();
                 }
-                writer.WriteLine($"=== END FILE: {relativePath} ===");
+                writer.WriteLine(FileFooter(relativePath));
 
                 // Blank line between files, but not after the last one
                 if (i < files.Count - 1)
@@ -79,19 +94,17 @@ public class CodeAggregatorService : ICodeAggregatorService
         _logger.LogInformation("Output file size: {FileSize}", FormatFileSize(fileSize));
     }
 
-    private static int CountLines(string content)
+    /// <summary>
+    /// Counts lines of content. A trailing newline does not start a new (empty) line,
+    /// so "A\nB\n" counts as 2 lines, not 3.
+    /// </summary>
+    internal static int CountLines(string content)
     {
         if (string.IsNullOrEmpty(content))
             return 0;
 
-        var lines = 1;
-        for (var i = 0; i < content.Length; i++)
-        {
-            if (content[i] == '\n')
-                lines++;
-        }
-
-        return lines;
+        var newlines = content.AsSpan().Count('\n');
+        return content[^1] == '\n' ? newlines : newlines + 1;
     }
 
     internal static string FormatFileSize(long bytes)

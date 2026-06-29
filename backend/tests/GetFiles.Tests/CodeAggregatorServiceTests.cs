@@ -88,8 +88,16 @@ public class CodeAggregatorServiceTests : IDisposable
 
         // Assert
         var output = File.ReadAllText(_outputPath);
-        Assert.Contains("=== FILE: Program.cs ===", output);
-        Assert.Contains("=== END FILE: Program.cs ===", output);
+        Assert.Contains(CodeAggregatorService.FileHeader("Program.cs"), output);
+        Assert.Contains(CodeAggregatorService.FileFooter("Program.cs"), output);
+    }
+
+    [Fact]
+    public void DelimiterHelpers_ProduceTheExpectedWireFormat()
+    {
+        // Pins the single-source-of-truth delimiter format the downstream LLM parses.
+        Assert.Equal("=== FILE: foo.cs ===", CodeAggregatorService.FileHeader("foo.cs"));
+        Assert.Equal("=== END FILE: foo.cs ===", CodeAggregatorService.FileFooter("foo.cs"));
     }
 
     [Fact]
@@ -104,8 +112,8 @@ public class CodeAggregatorServiceTests : IDisposable
 
         // Assert
         var output = File.ReadAllText(_outputPath);
-        Assert.Contains("=== FILE: src/Models/Foo.cs ===", output);
-        Assert.Contains("=== END FILE: src/Models/Foo.cs ===", output);
+        Assert.Contains(CodeAggregatorService.FileHeader("src/Models/Foo.cs"), output);
+        Assert.Contains(CodeAggregatorService.FileFooter("src/Models/Foo.cs"), output);
         Assert.DoesNotContain("\\", output);
     }
 
@@ -123,17 +131,17 @@ public class CodeAggregatorServiceTests : IDisposable
 
         // Assert
         var output = File.ReadAllText(_outputPath);
-        Assert.Contains("=== FILE: A.cs ===", output);
+        Assert.Contains(CodeAggregatorService.FileHeader("A.cs"), output);
         Assert.Contains("class A {}", output);
-        Assert.Contains("=== END FILE: A.cs ===", output);
+        Assert.Contains(CodeAggregatorService.FileFooter("A.cs"), output);
 
-        Assert.Contains("=== FILE: B.cs ===", output);
+        Assert.Contains(CodeAggregatorService.FileHeader("B.cs"), output);
         Assert.Contains("class B {}", output);
-        Assert.Contains("=== END FILE: B.cs ===", output);
+        Assert.Contains(CodeAggregatorService.FileFooter("B.cs"), output);
 
-        Assert.Contains("=== FILE: sub/C.cs ===", output);
+        Assert.Contains(CodeAggregatorService.FileHeader("sub/C.cs"), output);
         Assert.Contains("class C {}", output);
-        Assert.Contains("=== END FILE: sub/C.cs ===", output);
+        Assert.Contains(CodeAggregatorService.FileFooter("sub/C.cs"), output);
     }
 
     [Fact]
@@ -213,10 +221,40 @@ public class CodeAggregatorServiceTests : IDisposable
         // Assert
         var lines = File.ReadAllLines(_outputPath);
         // Find the END FILE line for first file, next should be blank, then header of second file
-        var endFileIndex = Array.FindIndex(lines, l => l.Contains("=== END FILE: A.cs ==="));
+        var endFileIndex = Array.FindIndex(lines, l => l.Contains(CodeAggregatorService.FileFooter("A.cs")));
         Assert.True(endFileIndex >= 0, "Could not find END FILE marker for A.cs");
         Assert.Equal("", lines[endFileIndex + 1]);
-        Assert.Contains("=== FILE: B.cs ===", lines[endFileIndex + 2]);
+        Assert.Contains(CodeAggregatorService.FileHeader("B.cs"), lines[endFileIndex + 2]);
+    }
+
+    [Fact]
+    public void Aggregate_OutputHasNoUtf8Bom()
+    {
+        // Arrange
+        var file = CreateFile("Program.cs", "class A {}\n");
+        var files = new List<string> { file };
+
+        // Act
+        _service.Aggregate(files, _repoDir, _outputPath, stripComments: false, stripWhitespace: false);
+
+        // Assert — first bytes must be the delimiter, not EF BB BF.
+        var bytes = File.ReadAllBytes(_outputPath);
+        Assert.True(bytes.Length >= 3);
+        Assert.False(bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF,
+            "Output file should not start with a UTF-8 BOM");
+        Assert.Equal((byte)'=', bytes[0]);
+    }
+
+    [Theory]
+    [InlineData("", 0)]
+    [InlineData("A", 1)]
+    [InlineData("A\nB", 2)]
+    [InlineData("A\nB\n", 2)]       // trailing newline does not add a line
+    [InlineData("A\n", 1)]
+    [InlineData("\n", 1)]
+    public void CountLines_DoesNotOverCountTrailingNewline(string content, int expected)
+    {
+        Assert.Equal(expected, CodeAggregatorService.CountLines(content));
     }
 
     [Fact]

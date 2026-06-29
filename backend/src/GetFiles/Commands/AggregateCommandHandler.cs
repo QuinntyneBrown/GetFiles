@@ -1,4 +1,3 @@
-using System.CommandLine.Invocation;
 using GetFiles.Services;
 using Microsoft.Extensions.Logging;
 
@@ -26,14 +25,12 @@ public class AggregateCommandHandler
 
     /// <summary>
     /// Executes the aggregate workflow: discover files, then aggregate them.
+    /// The strip flags are already resolved to their effective values by the caller.
     /// </summary>
-    public int Execute(string path, string output, bool stripComments, bool stripWhitespace, bool noStripComments, bool noStripWhitespace, string[] ignore)
+    public int Execute(string path, string output, bool stripComments, bool stripWhitespace, string[] ignore)
     {
         try
         {
-            var effectiveStripComments = stripComments && !noStripComments;
-            var effectiveStripWhitespace = stripWhitespace && !noStripWhitespace;
-
             var repositoryPath = Path.GetFullPath(path);
 
             if (!Directory.Exists(repositoryPath))
@@ -47,7 +44,7 @@ public class AggregateCommandHandler
 
             _logger.LogInformation("Found {Count} file(s). Aggregating...", files.Count);
             var outputPath = Path.GetFullPath(output);
-            _codeAggregatorService.Aggregate(files, repositoryPath, outputPath, effectiveStripComments, effectiveStripWhitespace);
+            _codeAggregatorService.Aggregate(files, repositoryPath, outputPath, stripComments, stripWhitespace);
 
             _logger.LogInformation("Aggregation complete. Output written to {OutputPath}", outputPath);
             return 0;

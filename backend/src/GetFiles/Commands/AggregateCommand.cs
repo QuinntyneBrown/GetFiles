@@ -51,6 +51,18 @@ public class AggregateCommand : Command
         IgnoreOption.AddAlias("-i");
         IgnoreOption.AllowMultipleArgumentsPerToken = true;
 
+        VerboseOption = new Option<bool>(
+            name: "--verbose",
+            description: "Enable verbose (Debug-level) logging, including per-file exclusion diagnostics",
+            getDefaultValue: () => false);
+        VerboseOption.AddAlias("-v");
+
+        QuietOption = new Option<bool>(
+            name: "--quiet",
+            description: "Reduce logging to warnings and errors only",
+            getDefaultValue: () => false);
+        QuietOption.AddAlias("-q");
+
         AddOption(PathOption);
         AddOption(OutputOption);
         AddOption(StripCommentsOption);
@@ -58,6 +70,8 @@ public class AggregateCommand : Command
         AddOption(NoStripCommentsOption);
         AddOption(NoStripWhitespaceOption);
         AddOption(IgnoreOption);
+        AddOption(VerboseOption);
+        AddOption(QuietOption);
     }
 
     public Option<string> PathOption { get; }
@@ -67,4 +81,6 @@ public class AggregateCommand : Command
     public Option<bool> NoStripCommentsOption { get; }
     public Option<bool> NoStripWhitespaceOption { get; }
     public Option<string[]> IgnoreOption { get; }
+    public Option<bool> VerboseOption { get; }
+    public Option<bool> QuietOption { get; }
 }
