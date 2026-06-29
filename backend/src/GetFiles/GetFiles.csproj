@@ -17,7 +17,7 @@
     <PackageProjectUrl>https://github.com/QuinntyneBrown/GetFiles</PackageProjectUrl>
     <RepositoryUrl>https://github.com/QuinntyneBrown/GetFiles</RepositoryUrl>
     <PackageTags>cli;code-aggregator;llm;dotnet-tool</PackageTags>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -89,15 +89,15 @@ gf aggregate --path <repository-path> [options]
 
 ### Options
 
-| Option | Description | Default |
-| --- | --- | --- |
-| `--path` | Root path of the repository to scan. | _(required)_ |
-| `--output` | Output file path. | `codebase.txt` |
-| `--strip-comments` | Remove comments from source files. | `true` |
-| `--no-strip-comments` | Keep comments intact (overrides `--strip-comments`). | `false` |
-| `--strip-whitespace` | Collapse unnecessary whitespace. | `true` |
-| `--no-strip-whitespace` | Keep whitespace intact (overrides `--strip-whitespace`). | `false` |
-| `--ignore` | Additional folder/path names to exclude. Repeatable. | _(none)_ |
+| Option | Alias | Description | Default |
+| --- | --- | --- | --- |
+| `--path` | `-p` | Root path of the repository to scan. | _(required)_ |
+| `--output` | `-o` | Output file path. | `codebase.txt` |
+| `--strip-comments` | | Remove comments from source files. | `true` |
+| `--no-strip-comments` | | Keep comments intact (overrides `--strip-comments`). | `false` |
+| `--strip-whitespace` | | Collapse unnecessary whitespace. | `true` |
+| `--no-strip-whitespace` | | Keep whitespace intact (overrides `--strip-whitespace`). | `false` |
+| `--ignore` | `-i` | Additional folder/path names to exclude. Repeatable. | _(none)_ |
 
 > **Note**
 > Comment and whitespace stripping are **on by default** to minimize token usage. Pass
@@ -127,6 +127,12 @@ Exclude additional directories (the flag is repeatable):
 
 ```bash
 gf aggregate --path ./my-repo --ignore coverage --ignore .vscode
+```
+
+The `--path`, `--output`, and `--ignore` options also accept short aliases (`-p`, `-o`, `-i`):
+
+```bash
+gf aggregate -p ./my-repo -o context.txt -i coverage
 ```
 
 ## Output Format

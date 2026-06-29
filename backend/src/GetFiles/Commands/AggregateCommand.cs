@@ -16,11 +16,13 @@ public class AggregateCommand : Command
         {
             IsRequired = true
         };
+        PathOption.AddAlias("-p");
 
         OutputOption = new Option<string>(
             name: "--output",
             description: "The output file path for the aggregated content",
             getDefaultValue: () => "codebase.txt");
+        OutputOption.AddAlias("-o");
 
         StripCommentsOption = new Option<bool>(
             name: "--strip-comments",
@@ -46,6 +48,7 @@ public class AggregateCommand : Command
             name: "--ignore",
             description: "Additional folders/paths to exclude from file discovery (can be specified multiple times)",
             getDefaultValue: () => Array.Empty<string>());
+        IgnoreOption.AddAlias("-i");
         IgnoreOption.AllowMultipleArgumentsPerToken = true;
 
         AddOption(PathOption);
