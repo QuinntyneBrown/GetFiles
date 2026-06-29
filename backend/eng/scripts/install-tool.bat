@@ -30,5 +30,5 @@ if %errorlevel% neq 0 (
 
 echo.
 echo === Done ===
-get-files --version
+gf --version
 endlocal

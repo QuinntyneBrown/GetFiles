@@ -35,7 +35,7 @@ to avoid duplicates. A great bug report includes:
 - The command you ran (including all flags).
 - What you expected to happen and what actually happened.
 - Your operating system and the output of `dotnet --version`.
-- The installed tool version (`get-files --version`).
+- The installed tool version (`gf --version`).
 
 ## Suggesting Enhancements
 

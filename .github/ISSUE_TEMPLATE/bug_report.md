@@ -15,7 +15,7 @@ A clear and concise description of what the bug is.
 The exact command you ran, including all flags:
 
 ```bash
-get-files aggregate --path ... 
+gf -p ... 
 ```
 
 Steps to reproduce the behavior:
@@ -33,7 +33,7 @@ What actually happened. Include any error output or relevant log lines.
 
 ## Environment
 
-- GetFiles version (`get-files --version`):
+- GetFiles version (`gf --version`):
 - OS (and version):
 - .NET version (`dotnet --version`):
 

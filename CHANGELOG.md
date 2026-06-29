@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0]
+
+### Added
+
+- `aggregate` is now the default command and can be omitted: `gf -p ./repo` is
+  equivalent to `gf aggregate -p ./repo`. Help (`-h`, `--help`, `-?`) and version
+  (`--version`) flags are passed through unchanged, and the explicit
+  `gf aggregate ...` form continues to work.
+
+## [1.2.0]
+
+### Added
+
+- Short aliases for the `aggregate` options: `-p` (`--path`), `-o` (`--output`),
+  and `-i` (`--ignore`).
+
+## [1.1.0]
+
+### Changed
+
+- **Breaking:** renamed the CLI command from `get-files` to `gf` for quicker
+  invocation. The package ID (`QuinntyneBrown.GetFiles`) is unchanged, so
+  installation is still `dotnet tool install --global QuinntyneBrown.GetFiles`;
+  update any scripts that invoked `get-files` to use `gf`.
+
 ### Added
 
 - Continuous integration workflow (build & test on Linux, Windows, and macOS).
@@ -27,5 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Whitespace stripping to reduce token usage.
 - `--ignore` option to exclude additional directories.
 
-[Unreleased]: https://github.com/QuinntyneBrown/GetFiles/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/QuinntyneBrown/GetFiles/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/QuinntyneBrown/GetFiles/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/QuinntyneBrown/GetFiles/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/QuinntyneBrown/GetFiles/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/QuinntyneBrown/GetFiles/releases/tag/v1.0.0
